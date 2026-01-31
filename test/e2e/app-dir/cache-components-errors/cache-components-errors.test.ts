@@ -128,7 +128,7 @@ describe('Cache Components Errors', () => {
                "Route "/dynamic-metadata-static-route" has a \`generateMetadata\` that depends on Request data (\`cookies()\`, etc...) or uncached external data (\`fetch(...)\`, etc...) when the rest of the route does not. See more info here: https://nextjs.org/docs/messages/next-prerender-dynamic-metadata
                Error occurred prerendering page "/dynamic-metadata-static-route". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/dynamic-metadata-static-route/page: /dynamic-metadata-static-route"
               `)
           } else {
@@ -200,7 +200,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/dynamic-metadata-error-route" in your browser to investigate the error.
                Error occurred prerendering page "/dynamic-metadata-error-route". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/dynamic-metadata-error-route/page: /dynamic-metadata-error-route"
               `)
             } else {
@@ -224,7 +224,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/dynamic-metadata-error-route" in your browser to investigate the error.
                Error occurred prerendering page "/dynamic-metadata-error-route". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/dynamic-metadata-error-route/page: /dynamic-metadata-error-route"
               `)
             } else {
@@ -317,7 +317,7 @@ describe('Cache Components Errors', () => {
                "Route "/dynamic-metadata-static-with-suspense" has a \`generateMetadata\` that depends on Request data (\`cookies()\`, etc...) or uncached external data (\`fetch(...)\`, etc...) when the rest of the route does not. See more info here: https://nextjs.org/docs/messages/next-prerender-dynamic-metadata
                Error occurred prerendering page "/dynamic-metadata-static-with-suspense". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/dynamic-metadata-static-with-suspense/page: /dynamic-metadata-static-with-suspense"
               `)
           } else {
@@ -407,7 +407,7 @@ describe('Cache Components Errors', () => {
              "Route "/dynamic-viewport-static-route" has a \`generateViewport\` that depends on Request data (\`cookies()\`, etc...) or uncached external data (\`fetch(...)\`, etc...) without explicitly allowing fully dynamic rendering. See more info here: https://nextjs.org/docs/messages/next-prerender-dynamic-viewport
              Error occurred prerendering page "/dynamic-viewport-static-route". Read more: https://nextjs.org/docs/messages/prerender-error
 
-             > Export encountered errors on following paths:
+             > Export encountered errors on following 1 path:
              	/dynamic-viewport-static-route/page: /dynamic-viewport-static-route"
             `)
           } else {
@@ -472,7 +472,7 @@ describe('Cache Components Errors', () => {
              "Route "/dynamic-viewport-dynamic-route" has a \`generateViewport\` that depends on Request data (\`cookies()\`, etc...) or uncached external data (\`fetch(...)\`, etc...) without explicitly allowing fully dynamic rendering. See more info here: https://nextjs.org/docs/messages/next-prerender-dynamic-viewport
              Error occurred prerendering page "/dynamic-viewport-dynamic-route". Read more: https://nextjs.org/docs/messages/prerender-error
 
-             > Export encountered errors on following paths:
+             > Export encountered errors on following 1 path:
              	/dynamic-viewport-dynamic-route/page: /dynamic-viewport-dynamic-route"
             `)
           } else {
@@ -603,7 +603,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/dynamic-root" in your browser to investigate the error.
                Error occurred prerendering page "/dynamic-root". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/dynamic-root/page: /dynamic-root"
               `)
             } else {
@@ -653,7 +653,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/dynamic-root" in your browser to investigate the error.
                Error occurred prerendering page "/dynamic-root". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/dynamic-root/page: /dynamic-root"
               `)
             } else {
@@ -803,7 +803,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-random-with-fallback" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-random-with-fallback". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-random-with-fallback/page: /sync-random-with-fallback"
                 `)
               } else {
@@ -820,7 +820,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-random-with-fallback" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-random-with-fallback". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-random-with-fallback/page: /sync-random-with-fallback"
                 `)
               }
@@ -914,7 +914,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-random-without-fallback" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-random-without-fallback". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-random-without-fallback/page: /sync-random-without-fallback"
                 `)
               } else {
@@ -932,7 +932,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-random-without-fallback" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-random-without-fallback". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-random-without-fallback/page: /sync-random-without-fallback"
                 `)
               }
@@ -1173,7 +1173,7 @@ describe('Cache Components Errors', () => {
                    digest: '<error-digest>'
                  }
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-cookies/page: /sync-cookies"
                 `)
               } else {
@@ -1192,7 +1192,7 @@ describe('Cache Components Errors', () => {
                    digest: '<error-digest>'
                  }
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-cookies/page: /sync-cookies"
                 `)
               }
@@ -1509,7 +1509,7 @@ describe('Cache Components Errors', () => {
                    digest: '<error-digest>'
                  }
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-headers/page: /sync-headers"
                 `)
               } else {
@@ -1528,7 +1528,7 @@ describe('Cache Components Errors', () => {
                    digest: '<error-digest>'
                  }
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-headers/page: /sync-headers"
                 `)
               }
@@ -1815,7 +1815,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-attribution/guarded-async-unguarded-clientsync" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-attribution/guarded-async-unguarded-clientsync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-attribution/guarded-async-unguarded-clientsync/page: /sync-attribution/guarded-async-unguarded-clientsync"
                 `)
               } else {
@@ -1832,7 +1832,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-attribution/guarded-async-unguarded-clientsync" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-attribution/guarded-async-unguarded-clientsync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-attribution/guarded-async-unguarded-clientsync/page: /sync-attribution/guarded-async-unguarded-clientsync"
                 `)
               }
@@ -1938,7 +1938,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-attribution/unguarded-async-guarded-clientsync" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-attribution/unguarded-async-guarded-clientsync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-attribution/unguarded-async-guarded-clientsync/page: /sync-attribution/unguarded-async-guarded-clientsync"
                 `)
               } else {
@@ -1966,7 +1966,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-attribution/unguarded-async-guarded-clientsync" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-attribution/unguarded-async-guarded-clientsync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-attribution/unguarded-async-guarded-clientsync/page: /sync-attribution/unguarded-async-guarded-clientsync"
                 `)
               } else {
@@ -2075,7 +2075,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-attribution/unguarded-async-unguarded-clientsync" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-attribution/unguarded-async-unguarded-clientsync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-attribution/unguarded-async-unguarded-clientsync/page: /sync-attribution/unguarded-async-unguarded-clientsync"
                 `)
               } else {
@@ -2092,7 +2092,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-attribution/unguarded-async-unguarded-clientsync" in your browser to investigate the error.
                  Error occurred prerendering page "/sync-attribution/unguarded-async-unguarded-clientsync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/sync-attribution/unguarded-async-unguarded-clientsync/page: /sync-attribution/unguarded-async-unguarded-clientsync"
                 `)
               }
@@ -2181,7 +2181,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-cookies" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-cookies". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-cookies/page: /use-cache-cookies"
                 `)
               } else {
@@ -2217,7 +2217,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-cookies" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-cookies". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-cookies/page: /use-cache-cookies"
                 `)
               } else {
@@ -2286,7 +2286,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-draft-mode" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-draft-mode". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-draft-mode/page: /use-cache-draft-mode"
                 `)
               } else {
@@ -2303,7 +2303,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-draft-mode" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-draft-mode". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-draft-mode/page: /use-cache-draft-mode"
                 `)
               }
@@ -2390,7 +2390,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-headers" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-headers". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-headers/page: /use-cache-headers"
                 `)
               } else {
@@ -2426,7 +2426,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-headers" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-headers". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-headers/page: /use-cache-headers"
                 `)
               } else {
@@ -2503,7 +2503,7 @@ describe('Cache Components Errors', () => {
                    To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-low-expire/fast" in your browser to investigate the error.
                    Error occurred prerendering page "/use-cache-low-expire/fast". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                   > Export encountered errors on following paths:
+                   > Export encountered errors on following 1 path:
                    	/use-cache-low-expire/fast/page: /use-cache-low-expire/fast"
                   `)
                 } else {
@@ -2527,7 +2527,7 @@ describe('Cache Components Errors', () => {
                    To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-low-expire/fast" in your browser to investigate the error.
                    Error occurred prerendering page "/use-cache-low-expire/fast". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                   > Export encountered errors on following paths:
+                   > Export encountered errors on following 1 path:
                    	/use-cache-low-expire/fast/page: /use-cache-low-expire/fast"
                   `)
                 } else {
@@ -2634,7 +2634,7 @@ describe('Cache Components Errors', () => {
                    To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-low-expire/slow" in your browser to investigate the error.
                    Error occurred prerendering page "/use-cache-low-expire/slow". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                   > Export encountered errors on following paths:
+                   > Export encountered errors on following 1 path:
                    	/use-cache-low-expire/slow/page: /use-cache-low-expire/slow"
                   `)
                 } else {
@@ -2658,7 +2658,7 @@ describe('Cache Components Errors', () => {
                    To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-low-expire/slow" in your browser to investigate the error.
                    Error occurred prerendering page "/use-cache-low-expire/slow". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                   > Export encountered errors on following paths:
+                   > Export encountered errors on following 1 path:
                    	/use-cache-low-expire/slow/page: /use-cache-low-expire/slow"
                   `)
                 } else {
@@ -2768,7 +2768,7 @@ describe('Cache Components Errors', () => {
                    To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-revalidate-0/fast" in your browser to investigate the error.
                    Error occurred prerendering page "/use-cache-revalidate-0/fast". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                   > Export encountered errors on following paths:
+                   > Export encountered errors on following 1 path:
                    	/use-cache-revalidate-0/fast/page: /use-cache-revalidate-0/fast"
                   `)
                 } else {
@@ -2792,7 +2792,7 @@ describe('Cache Components Errors', () => {
                    To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-revalidate-0/fast" in your browser to investigate the error.
                    Error occurred prerendering page "/use-cache-revalidate-0/fast". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                   > Export encountered errors on following paths:
+                   > Export encountered errors on following 1 path:
                    	/use-cache-revalidate-0/fast/page: /use-cache-revalidate-0/fast"
                   `)
                 } else {
@@ -2899,7 +2899,7 @@ describe('Cache Components Errors', () => {
                    To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-revalidate-0/slow" in your browser to investigate the error.
                    Error occurred prerendering page "/use-cache-revalidate-0/slow". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                   > Export encountered errors on following paths:
+                   > Export encountered errors on following 1 path:
                    	/use-cache-revalidate-0/slow/page: /use-cache-revalidate-0/slow"
                   `)
                 } else {
@@ -2923,7 +2923,7 @@ describe('Cache Components Errors', () => {
                    To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-revalidate-0/slow" in your browser to investigate the error.
                    Error occurred prerendering page "/use-cache-revalidate-0/slow". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                   > Export encountered errors on following paths:
+                   > Export encountered errors on following 1 path:
                    	/use-cache-revalidate-0/slow/page: /use-cache-revalidate-0/slow"
                   `)
                 } else {
@@ -3030,7 +3030,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-params/[slug]" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-params/[slug]". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-params/[slug]/page: /use-cache-params/[slug]"
                 `)
               } else {
@@ -3054,7 +3054,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-params/[slug]" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-params/[slug]". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-params/[slug]/page: /use-cache-params/[slug]"
                 `)
               } else {
@@ -3308,7 +3308,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-private-in-unstable-cache" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-private-in-unstable-cache". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-private-in-unstable-cache/page: /use-cache-private-in-unstable-cache"
                 `)
               } else {
@@ -3326,7 +3326,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-private-in-unstable-cache" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-private-in-unstable-cache". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-private-in-unstable-cache/page: /use-cache-private-in-unstable-cache"
                 `)
               }
@@ -3433,7 +3433,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-private-in-use-cache" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-private-in-use-cache". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-private-in-use-cache/page: /use-cache-private-in-use-cache"
                 `)
               } else
@@ -3465,7 +3465,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-private-in-use-cache" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-private-in-use-cache". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-private-in-use-cache/page: /use-cache-private-in-use-cache"
                 `)
             } else {
@@ -3584,7 +3584,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-private-without-suspense" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-private-without-suspense". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-private-without-suspense/page: /use-cache-private-without-suspense"
                 `)
               } else {
@@ -3608,7 +3608,7 @@ describe('Cache Components Errors', () => {
                  To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/use-cache-private-without-suspense" in your browser to investigate the error.
                  Error occurred prerendering page "/use-cache-private-without-suspense". Read more: https://nextjs.org/docs/messages/prerender-error
 
-                 > Export encountered errors on following paths:
+                 > Export encountered errors on following 1 path:
                  	/use-cache-private-without-suspense/page: /use-cache-private-without-suspense"
                 `)
               } else {
@@ -3747,7 +3747,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-current-time/date" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-current-time/date". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-current-time/date/page: /sync-io-current-time/date"
               `)
             } else {
@@ -3763,7 +3763,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-current-time/date" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-current-time/date". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-current-time/date/page: /sync-io-current-time/date"
               `)
             }
@@ -3849,7 +3849,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-current-time/date-now" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-current-time/date-now". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-current-time/date-now/page: /sync-io-current-time/date-now"
               `)
             } else {
@@ -3865,7 +3865,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-current-time/date-now" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-current-time/date-now". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-current-time/date-now/page: /sync-io-current-time/date-now"
               `)
             }
@@ -3951,7 +3951,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-current-time/new-date" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-current-time/new-date". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-current-time/new-date/page: /sync-io-current-time/new-date"
               `)
             } else {
@@ -3967,7 +3967,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-current-time/new-date" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-current-time/new-date". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-current-time/new-date/page: /sync-io-current-time/new-date"
               `)
             }
@@ -4053,7 +4053,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-random/math-random" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-random/math-random". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-random/math-random/page: /sync-io-random/math-random"
               `)
             } else {
@@ -4069,7 +4069,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-random/math-random" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-random/math-random". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-random/math-random/page: /sync-io-random/math-random"
               `)
             }
@@ -4156,7 +4156,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-web-crypto/get-random-value" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-web-crypto/get-random-value". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-web-crypto/get-random-value/page: /sync-io-web-crypto/get-random-value"
               `)
             } else {
@@ -4173,7 +4173,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-web-crypto/get-random-value" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-web-crypto/get-random-value". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-web-crypto/get-random-value/page: /sync-io-web-crypto/get-random-value"
               `)
             }
@@ -4260,7 +4260,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-web-crypto/random-uuid" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-web-crypto/random-uuid". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-web-crypto/random-uuid/page: /sync-io-web-crypto/random-uuid"
               `)
             } else {
@@ -4276,7 +4276,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-web-crypto/random-uuid" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-web-crypto/random-uuid". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-web-crypto/random-uuid/page: /sync-io-web-crypto/random-uuid"
               `)
             }
@@ -4380,7 +4380,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/generate-key-pair-sync" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/generate-key-pair-sync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/generate-key-pair-sync/page: /sync-io-node-crypto/generate-key-pair-sync"
               `)
             } else {
@@ -4416,7 +4416,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/generate-key-pair-sync" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/generate-key-pair-sync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/generate-key-pair-sync/page: /sync-io-node-crypto/generate-key-pair-sync"
               `)
             } else {
@@ -4502,7 +4502,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/generate-key-sync" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/generate-key-sync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/generate-key-sync/page: /sync-io-node-crypto/generate-key-sync"
               `)
             } else {
@@ -4538,7 +4538,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/generate-key-sync" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/generate-key-sync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/generate-key-sync/page: /sync-io-node-crypto/generate-key-sync"
               `)
             } else {
@@ -4624,7 +4624,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/generate-prime-sync" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/generate-prime-sync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/generate-prime-sync/page: /sync-io-node-crypto/generate-prime-sync"
               `)
             } else {
@@ -4660,7 +4660,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/generate-prime-sync" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/generate-prime-sync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/generate-prime-sync/page: /sync-io-node-crypto/generate-prime-sync"
               `)
             } else {
@@ -4746,7 +4746,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/get-random-values" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/get-random-values". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/get-random-values/page: /sync-io-node-crypto/get-random-values"
               `)
             } else {
@@ -4782,7 +4782,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/get-random-values" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/get-random-values". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/get-random-values/page: /sync-io-node-crypto/get-random-values"
               `)
             } else {
@@ -4868,7 +4868,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-bytes" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-bytes". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-bytes/page: /sync-io-node-crypto/random-bytes"
               `)
             } else {
@@ -4904,7 +4904,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-bytes" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-bytes". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-bytes/page: /sync-io-node-crypto/random-bytes"
               `)
             } else {
@@ -4990,7 +4990,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-fill-sync" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-fill-sync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-fill-sync/page: /sync-io-node-crypto/random-fill-sync"
               `)
             } else {
@@ -5026,7 +5026,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-fill-sync" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-fill-sync". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-fill-sync/page: /sync-io-node-crypto/random-fill-sync"
               `)
             } else {
@@ -5112,7 +5112,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-int-between" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-int-between". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-int-between/page: /sync-io-node-crypto/random-int-between"
               `)
             } else {
@@ -5148,7 +5148,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-int-between" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-int-between". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-int-between/page: /sync-io-node-crypto/random-int-between"
               `)
             } else {
@@ -5234,7 +5234,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-int-up-to" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-int-up-to". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-int-up-to/page: /sync-io-node-crypto/random-int-up-to"
               `)
             } else {
@@ -5270,7 +5270,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-int-up-to" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-int-up-to". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-int-up-to/page: /sync-io-node-crypto/random-int-up-to"
               `)
             } else {
@@ -5356,7 +5356,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-uuid" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-uuid". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-uuid/page: /sync-io-node-crypto/random-uuid"
               `)
             } else {
@@ -5392,7 +5392,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/sync-io-node-crypto/random-uuid" in your browser to investigate the error.
                Error occurred prerendering page "/sync-io-node-crypto/random-uuid". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/sync-io-node-crypto/random-uuid/page: /sync-io-node-crypto/random-uuid"
               `)
             } else {
@@ -5475,7 +5475,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/client-awaited-io" in your browser to investigate the error.
                Error occurred prerendering page "/client-awaited-io". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/client-awaited-io/page: /client-awaited-io"
               `)
             } else {
@@ -5507,7 +5507,7 @@ describe('Cache Components Errors', () => {
                To get a more detailed stack trace and pinpoint the issue, start the app in development mode by running \`next dev\`, then open "/client-awaited-io" in your browser to investigate the error.
                Error occurred prerendering page "/client-awaited-io". Read more: https://nextjs.org/docs/messages/prerender-error
 
-               > Export encountered errors on following paths:
+               > Export encountered errors on following 1 path:
                	/client-awaited-io/page: /client-awaited-io"
               `)
             } else {
