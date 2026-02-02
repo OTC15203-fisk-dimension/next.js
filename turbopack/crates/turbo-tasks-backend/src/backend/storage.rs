@@ -1,19 +1,23 @@
 use std::{
-    hash::Hash,
     ops::{Deref, DerefMut},
-    sync::{Arc, atomic::AtomicBool},
+    sync::{
+        Arc,
+        atomic::{AtomicU8, Ordering},
+    },
+    thread,
 };
 
-use smallvec::SmallVec;
 use turbo_bincode::TurboBincodeBuffer;
-use turbo_tasks::{FxDashMap, TaskId, parallel};
+use turbo_tasks::{FxDashMap, TaskId, parallel, scope::scope_and_block, util::good_chunk_size};
 
 use crate::{
     backend::storage_schema::TaskStorage,
+    backing_storage::SnapshotItem,
     database::key_value_database::KeySpace,
     utils::{
         dash_map_drop_contents::drop_contents,
         dash_map_multi::{RefMut, get_multiple_mut},
+        sharded::Sharded,
     },
 };
 
@@ -58,42 +62,76 @@ impl SpecificTaskDataCategory {
     }
 }
 
-enum ModifiedState {
-    /// It was modified before snapshot mode was entered, but it was not accessed during snapshot
-    /// mode.
-    Modified,
-    /// Snapshot(Some):
-    /// It was modified before snapshot mode was entered and it was accessed again during snapshot
-    /// mode. A copy of the version of the item when snapshot mode was entered is stored here.
-    /// The `TaskStorage` contains only persistent fields (via `clone_snapshot()`), and has
-    /// `meta_modified`/`data_modified` flags set to indicate which categories need serializing.
-    /// Snapshot(None):
-    /// It was not modified before snapshot mode was entered, but it was accessed during snapshot
-    /// mode. Or the snapshot was already taken out by the snapshot operation.
-    Snapshot(Option<Box<TaskStorage>>),
+/// Number of shards for the snapshots map. This is intentionally small since:
+/// 1. Snapshots are rare (only during dev mode idle-callback persistence races)
+/// 2. We're otherwise saturating the CPU doing persistence, so lock contention here doesn't matter.
+/// 3. We want to minimize fixed overhead from sharding
+const SNAPSHOT_SHARDS: usize = 16;
+
+/// Snapshot mode state machine:
+/// - `Inactive`: Not snapshotting. Modifications go to modified list.
+/// - `Active`: Actively snapshotting. Modifications go to snapshots map.
+/// - `Completing`: Snapshot done, end_snapshot is cleaning up. Modifications go to modified list,
+///   but new snapshot can't start yet (must wait for cleanup to finish).
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SnapshotMode {
+    /// Default, not persisting
+    Inactive = 0,
+    /// Actively serializing to disk
+    Active = 1,
+    /// Serialization is done, datastructures are being reconciled.
+    /// This state is necessary to enable safely clearing the snapshot map
+    Completing = 2,
+}
+
+impl SnapshotMode {
+    fn from_u8(value: u8) -> Self {
+        match value {
+            0 => SnapshotMode::Inactive,
+            1 => SnapshotMode::Active,
+            2 => SnapshotMode::Completing,
+            _ => unreachable!("Invalid SnapshotMode value"),
+        }
+    }
 }
 
 pub struct Storage {
-    snapshot_mode: AtomicBool,
-    modified: FxDashMap<TaskId, ModifiedState>,
+    /// Whether to track modifications for persistence. When false, modifications are not tracked
+    /// and snapshot operations are no-ops. This avoids unbounded memory growth from the modified
+    /// list when persistence is disabled.
+    track_modifications: bool,
+    snapshot_mode: AtomicU8,
+    /// Tracks TaskIds that have been modified since the last snapshot.
+    /// Uses a sharded Vec for efficient append-only writes.
+    /// Writes are guarded by the `any_modified` flag on TaskStorage, ensuring single-write
+    /// semantics, thus we don't need to worry about duplicates.
+    modified: Sharded<Vec<TaskId>>,
+    /// Stores snapshots of task state for tasks accessed during snapshot mode.
+    /// - `Some(snapshot)`: Task was modified before snapshot mode and accessed again during it.
+    ///   Contains a copy of the pre-snapshot state that needs to be persisted.
+    /// - `None`: Task was first modified during snapshot mode (not part of current snapshot). Will
+    ///   be added to modified list for the next snapshot cycle.
+    snapshots: FxDashMap<TaskId, Option<Box<TaskStorage>>>,
     map: FxDashMap<TaskId, Box<TaskStorage>>,
 }
 
 impl Storage {
-    pub fn new(shard_amount: usize, small_preallocation: bool) -> Self {
+    pub fn new(shard_amount: usize, small_preallocation: bool, track_modifications: bool) -> Self {
         let map_capacity: usize = if small_preallocation {
             1024
         } else {
             1024 * 1024
         };
-        let modified_capacity: usize = if small_preallocation { 0 } else { 1024 };
 
         Self {
-            snapshot_mode: AtomicBool::new(false),
-            modified: FxDashMap::with_capacity_and_hasher_and_shard_amount(
-                modified_capacity,
+            track_modifications,
+            snapshot_mode: AtomicU8::new(SnapshotMode::Inactive as u8),
+            modified: Sharded::new(shard_amount),
+            snapshots: FxDashMap::with_capacity_and_hasher_and_shard_amount(
+                0, // Start empty, rarely used
                 Default::default(),
-                shard_amount,
+                SNAPSHOT_SHARDS,
             ),
             map: FxDashMap::with_capacity_and_hasher_and_shard_amount(
                 map_capacity,
@@ -112,10 +150,9 @@ impl Storage {
     pub fn take_snapshot<
         'l,
         T,
-        R,
         PP: for<'a> Fn(TaskId, &'a TaskStorage) -> T + Sync,
-        P: Fn(TaskId, T, &mut TurboBincodeBuffer) -> R + Sync,
-        PS: Fn(TaskId, Box<TaskStorage>, &mut TurboBincodeBuffer) -> R + Sync,
+        P: Fn(TaskId, T, &mut TurboBincodeBuffer) -> SnapshotItem + Sync,
+        PS: Fn(TaskId, Box<TaskStorage>, &mut TurboBincodeBuffer) -> SnapshotItem + Sync,
     >(
         &'l self,
         preprocess: &'l PP,
@@ -126,124 +163,146 @@ impl Storage {
             self.start_snapshot();
         }
 
-        let guard = Arc::new(SnapshotGuard { storage: self });
+        // Ideally these shards would be perfectly aligned with the dashmap so we could
+        // monolithically lock shards instead of acquiring a lock for each item.  But doing this
+        // would be pretty expensive.  If somehow lock acquisition costs become large we could
+        // revisit.
 
-        // The number of shards is much larger than the number of threads, so the effect of the
-        // locks held is negligible.
-        parallel::map_collect::<_, _, Vec<_>>(self.modified.shards(), |shard| {
-            let mut direct_snapshots: Vec<(TaskId, Box<TaskStorage>)> = Vec::new();
-            let mut modified: SmallVec<[TaskId; 4]> = SmallVec::new();
-            {
-                // Take the snapshots from the modified map
-                let guard = shard.write();
-                // Safety: guard must outlive the iterator.
-                for bucket in unsafe { guard.iter() } {
-                    // Safety: the guard guarantees that the bucket is not removed and the ptr
-                    // is valid.
-                    let (key, shared_value) = unsafe { bucket.as_mut() };
-                    let modified_state = shared_value.get_mut();
-                    match modified_state {
-                        ModifiedState::Modified => {
-                            modified.push(*key);
-                        }
-                        ModifiedState::Snapshot(snapshot) => {
-                            if let Some(snapshot) = snapshot.take() {
-                                direct_snapshots.push((*key, snapshot));
-                            }
-                        }
-                    }
-                }
-                // Safety: guard must outlive the iterator.
-                drop(guard);
-            }
-            /// How big of a buffer to allocate initially.  Based on metrics from a large
-            /// application this should cover about 98% of values with no resizes
-            const SCRATCH_BUFFER_SIZE: usize = 4096;
-            SnapshotShard {
-                direct_snapshots,
-                modified,
-                storage: self,
-                guard: Some(guard.clone()),
-                process,
-                preprocess,
-                process_snapshot,
-                scratch_buffer: TurboBincodeBuffer::with_capacity(SCRATCH_BUFFER_SIZE),
+        // Take all modified task IDs from the sharded Vecs
+        let modified_shards: Vec<Vec<TaskId>> = self.modified.take(|vec| vec);
+        let num_shards = modified_shards.len();
+
+        let guard = Arc::new(SnapshotGuard {
+            storage: self,
+            // Store the modified task IDs - they'll be used to clear flags when the snapshot ends
+            modified_tasks: modified_shards,
+        });
+
+        // Process modified shards in parallel, chunked to avoid spawning too many tasks
+        /// How big of a buffer to allocate initially. Based on metrics from a large
+        /// application this should cover about 98% of values with no resizes
+        const SCRATCH_BUFFER_SIZE: usize = 4096;
+
+        let chunk_size = good_chunk_size(num_shards);
+        let chunk_count = num_shards.div_ceil(chunk_size);
+
+        // Create one SnapshotShard per chunk, each handling a range of underlying shards
+        scope_and_block(chunk_count, |scope| {
+            for chunk_idx in 0..chunk_count {
+                let start_shard = chunk_idx * chunk_size;
+                let end_shard = ((chunk_idx + 1) * chunk_size).min(num_shards); // exclusive bound
+                let guard = guard.clone();
+                scope.spawn(move || SnapshotShard {
+                    end_shard,
+                    current_shard: start_shard,
+                    current_idx: 0,
+                    storage: self,
+                    guard,
+                    process,
+                    preprocess,
+                    process_snapshot,
+                    scratch_buffer: TurboBincodeBuffer::with_capacity(SCRATCH_BUFFER_SIZE),
+                });
             }
         })
+        .collect()
     }
 
-    /// Start snapshot mode.
+    /// Start snapshot mode. Spins if a previous snapshot is still completing.
     pub fn start_snapshot(&self) {
-        self.snapshot_mode
-            .store(true, std::sync::atomic::Ordering::Release);
+        loop {
+            match SnapshotMode::from_u8(self.snapshot_mode.load(Ordering::Acquire)) {
+                SnapshotMode::Inactive => {
+                    // Try to transition Inactive -> Active
+                    if self
+                        .snapshot_mode
+                        .compare_exchange(
+                            SnapshotMode::Inactive as u8,
+                            SnapshotMode::Active as u8,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        )
+                        .is_ok()
+                    {
+                        return;
+                    }
+                    // CAS failed, retry
+                }
+                SnapshotMode::Active => {
+                    // Already in snapshot mode, nothing to do
+                    return;
+                }
+                SnapshotMode::Completing => {
+                    // Previous snapshot is cleaning up, yield to OS scheduler.
+                    // This should basically never happen in practice, but prevents state
+                    // corruption if it somehow does.
+                    thread::yield_now();
+                }
+            }
+        }
     }
 
     /// End snapshot mode.
     /// Items that have snapshots will be kept as modified since they have been accessed during the
     /// snapshot mode. Items that are modified will be removed and considered as unmodified.
     /// When items are accessed in future they will be marked as modified.
-    fn end_snapshot(&self) {
-        // We are still in snapshot mode, so all accessed items would be stored as snapshot.
-        // This means we can start by removing all modified items.
-        let mut removed_modified = Vec::new();
-        self.modified.retain(|key, inner| {
-            if matches!(inner, ModifiedState::Modified) {
-                removed_modified.push(*key);
-                false
-            } else {
-                true
+    fn end_snapshot(&self, modified_tasks: Vec<Vec<TaskId>>) {
+        // Clear modified/new flags on all tasks that were in the original modified list.
+        // This must happen WHILE STILL IN snapshot mode so that any concurrent modifications
+        // will go to the `snapshots` map (since they see snapshot_mode=true and modified=false).
+        // We'll drain the snapshots map after leaving snapshot mode.
+        // Tasks that were removed or had no modifications will just have a no-op flag clear.
+        parallel::map_collect_owned::<_, _, Vec<_>>(modified_tasks, |task_ids| {
+            for task_id in task_ids {
+                if let Some(mut inner) = self.map.get_mut(&task_id) {
+                    inner.flags.set_data_modified(false);
+                    inner.flags.set_meta_modified(false);
+                    inner.flags.set_new_persistent_task(false);
+                }
             }
         });
-
-        // We also need to unset all the modified flags.
-        for key in removed_modified {
-            if let Some(mut inner) = self.map.get_mut(&key) {
-                inner.flags.set_data_modified(false);
-                inner.flags.set_meta_modified(false);
-            }
-        }
-
-        // Now modified only contains snapshots.
-        // We leave snapshot mode. Any access would be stored as modified and not as snapshot.
+        // Transition to Completing - modifications now go to modified list,
+        // but new snapshots can't start yet
         self.snapshot_mode
-            .store(false, std::sync::atomic::Ordering::Release);
+            .store(SnapshotMode::Completing as u8, Ordering::Release);
 
-        // We can change all the snapshots to modified now.
-        let mut removed_snapshots = Vec::new();
-        for mut item in self.modified.iter_mut() {
-            match item.value() {
-                ModifiedState::Snapshot(_) => {
-                    removed_snapshots.push(*item.key());
-                    *item.value_mut() = ModifiedState::Modified;
-                }
-                ModifiedState::Modified => {
-                    // This means it was concurrently modified.
-                    // It's already in the correct state.
+        // Handle tasks that had snapshots (they were accessed during snapshot mode).
+        // These need to be re-added to modified for the next cycle.
+        // Process shards in parallel, draining each shard.
+        // Safety: Holding map.get_mut() prevents concurrent track_modification for the same task.
+        parallel::for_each(self.snapshots.shards(), |shard| {
+            let mut guard = shard.write();
+            // Safety: guard must outlive the iterator
+            for bucket in unsafe { guard.iter() } {
+                // Safety: the guard guarantees the bucket is valid
+                let (key, _) = unsafe { bucket.as_ref() };
+                if let Some(mut inner) = self.map.get_mut(key) {
+                    // Convert snapshot flags to modified flags
+                    if inner.flags.meta_snapshot() {
+                        inner.flags.set_meta_snapshot(false);
+                        inner.flags.set_meta_modified(true);
+                    }
+                    if inner.flags.data_snapshot() {
+                        inner.flags.set_data_snapshot(false);
+                        inner.flags.set_data_modified(true);
+                    }
+                    // Re-add to modified list since they were accessed during snapshot
+                    self.modified.lock(*key).push(*key);
                 }
             }
-        }
+            guard.clear();
+        });
+        self.snapshots.shrink_to_fit();
 
-        // And update the flags
-        for key in removed_snapshots {
-            if let Some(mut inner) = self.map.get_mut(&key) {
-                if inner.flags.meta_snapshot() {
-                    inner.flags.set_meta_snapshot(false);
-                    inner.flags.set_meta_modified(true);
-                }
-                if inner.flags.data_snapshot() {
-                    inner.flags.set_data_snapshot(false);
-                    inner.flags.set_data_modified(true);
-                }
-            }
-        }
-
-        // Remove excessive capacity in modified
-        self.modified.shrink_to_fit();
+        // Finally transition to Inactive - new snapshots can start
+        self.snapshot_mode
+            .store(SnapshotMode::Inactive as u8, Ordering::Release);
     }
 
+    /// Returns true if actively snapshotting (modifications should go to snapshots map).
+    /// Returns false if Inactive or Completing (modifications go to modified list).
     fn snapshot_mode(&self) -> bool {
-        self.snapshot_mode
-            .load(std::sync::atomic::Ordering::Acquire)
+        SnapshotMode::from_u8(self.snapshot_mode.load(Ordering::Acquire)) == SnapshotMode::Active
     }
 
     pub fn access_mut(&self, key: TaskId) -> StorageWriteGuard<'_> {
@@ -277,7 +336,9 @@ impl Storage {
 
     pub fn drop_contents(&self) {
         drop_contents(&self.map);
-        drop_contents(&self.modified);
+        // Clear the modified list
+        self.modified.take(|_| ());
+        self.snapshots.clear();
     }
 }
 
@@ -306,6 +367,16 @@ impl StorageWriteGuard<'_> {
         category: SpecificTaskDataCategory,
         #[cfg(feature = "trace_task_modification")] name: &str,
     ) {
+        if !self.storage.track_modifications {
+            return;
+        }
+        // Skip tracking for uninitialized persistent tasks (persistent_task_type not yet set).
+        // This can happen due to the race between task_cache insertion and initialization —
+        // see the detailed comment in mod.rs snapshot `preprocess` closure.
+        // The task will be properly marked modified when init_persistent_task is called.
+        if self.inner.get_persistent_task_type().is_none() {
+            return;
+        }
         let flags = &self.inner.flags;
         if flags.is_snapshot(category) {
             return;
@@ -317,9 +388,9 @@ impl StorageWriteGuard<'_> {
             (false, false) => {
                 // Not in snapshot mode and item is unmodified
                 if !flags.any_snapshot() && !flags.any_modified() {
-                    self.storage
-                        .modified
-                        .insert(*self.inner.key(), ModifiedState::Modified);
+                    // First modification - add to modified list
+                    let key = *self.inner.key();
+                    self.storage.modified.lock(key).push(key);
                 }
                 self.inner.flags.set_modified(category, true);
             }
@@ -330,9 +401,7 @@ impl StorageWriteGuard<'_> {
             (true, false) => {
                 // In snapshot mode and item is unmodified (so it's not part of the snapshot)
                 if !flags.any_snapshot() {
-                    self.storage
-                        .modified
-                        .insert(*self.inner.key(), ModifiedState::Snapshot(None));
+                    self.storage.snapshots.insert(*self.inner.key(), None);
                 }
                 self.inner.flags.set_snapshot(category, true);
             }
@@ -344,10 +413,9 @@ impl StorageWriteGuard<'_> {
                     let mut snapshot = self.inner.clone_snapshot();
                     snapshot.flags.set_data_modified(flags.data_modified());
                     snapshot.flags.set_meta_modified(flags.meta_modified());
-                    self.storage.modified.insert(
-                        *self.inner.key(),
-                        ModifiedState::Snapshot(Some(Box::new(snapshot))),
-                    );
+                    self.storage
+                        .snapshots
+                        .insert(*self.inner.key(), Some(Box::new(snapshot)));
                 }
                 self.inner.flags.set_snapshot(category, true);
             }
@@ -371,19 +439,27 @@ impl DerefMut for StorageWriteGuard<'_> {
 
 pub struct SnapshotGuard<'l> {
     storage: &'l Storage,
+    /// Original modified task IDs from when the snapshot began.
+    /// Their modified/new flags will be cleared when the snapshot ends.
+    modified_tasks: Vec<Vec<TaskId>>,
 }
 
 impl Drop for SnapshotGuard<'_> {
     fn drop(&mut self) {
-        self.storage.end_snapshot();
+        self.storage
+            .end_snapshot(std::mem::take(&mut self.modified_tasks));
     }
 }
 
 pub struct SnapshotShard<'l, PP, P, PS> {
-    direct_snapshots: Vec<(TaskId, Box<TaskStorage>)>,
-    modified: SmallVec<[TaskId; 4]>,
+    /// End of the shard range (exclusive)
+    end_shard: usize,
+    /// Current shard being processed
+    current_shard: usize,
+    /// Current index within the current shard
+    current_idx: usize,
     storage: &'l Storage,
-    guard: Option<Arc<SnapshotGuard<'l>>>,
+    guard: Arc<SnapshotGuard<'l>>,
     process: &'l P,
     preprocess: &'l PP,
     process_snapshot: &'l PS,
@@ -391,51 +467,64 @@ pub struct SnapshotShard<'l, PP, P, PS> {
     scratch_buffer: TurboBincodeBuffer,
 }
 
-impl<'l, T, R, PP, P, PS> Iterator for SnapshotShard<'l, PP, P, PS>
+impl<'l, T, PP, P, PS> Iterator for SnapshotShard<'l, PP, P, PS>
 where
     PP: for<'a> Fn(TaskId, &'a TaskStorage) -> T + Sync,
-    P: Fn(TaskId, T, &mut TurboBincodeBuffer) -> R + Sync,
-    PS: Fn(TaskId, Box<TaskStorage>, &mut TurboBincodeBuffer) -> R + Sync,
+    P: Fn(TaskId, T, &mut TurboBincodeBuffer) -> SnapshotItem + Sync,
+    PS: Fn(TaskId, Box<TaskStorage>, &mut TurboBincodeBuffer) -> SnapshotItem + Sync,
 {
-    type Item = R;
+    type Item = SnapshotItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((task_id, snapshot)) = self.direct_snapshots.pop() {
-            return Some((self.process_snapshot)(
-                task_id,
-                snapshot,
-                &mut self.scratch_buffer,
-            ));
-        }
-        while let Some(task_id) = self.modified.pop() {
-            let inner = self.storage.map.get(&task_id).unwrap();
-            if !inner.flags.any_snapshot() {
-                let preprocessed = (self.preprocess)(task_id, &inner);
-                drop(inner);
-                return Some((self.process)(
-                    task_id,
-                    preprocessed,
-                    &mut self.scratch_buffer,
-                ));
-            } else {
-                drop(inner);
-                let maybe_snapshot = {
-                    let mut modified_state = self.storage.modified.get_mut(&task_id).unwrap();
-                    let ModifiedState::Snapshot(snapshot) = &mut *modified_state else {
-                        unreachable!("The snapshot bit was set, so it must be in Snapshot state");
-                    };
-                    snapshot.take()
+        // Iterate through all shards in our range
+        while self.current_shard < self.end_shard {
+            let shard = &self.guard.modified_tasks[self.current_shard];
+
+            // Process modified tasks in the current shard
+            while self.current_idx < shard.len() {
+                let task_id = shard[self.current_idx];
+                self.current_idx += 1;
+
+                let Some(inner) = self.storage.map.get(&task_id) else {
+                    // Task was removed, skip it
+                    continue;
                 };
-                if let Some(snapshot) = maybe_snapshot {
+
+                // Check if this task has a snapshot stored (it was accessed during snapshot mode)
+                // Use get_mut + take instead of remove so the entry stays in the map.
+                // end_snapshot needs to see these entries to re-add them to modified.
+                if let Some(snapshot) = self
+                    .storage
+                    .snapshots
+                    .get_mut(&task_id)
+                    .and_then(|mut e| e.take())
+                {
+                    drop(inner);
                     return Some((self.process_snapshot)(
                         task_id,
                         snapshot,
                         &mut self.scratch_buffer,
                     ));
                 }
+
+                // Normal case: task was modified but not accessed during snapshot
+                if inner.flags.any_modified() {
+                    let preprocessed = (self.preprocess)(task_id, &inner);
+                    drop(inner);
+
+                    return Some((self.process)(
+                        task_id,
+                        preprocessed,
+                        &mut self.scratch_buffer,
+                    ));
+                }
             }
+
+            // Move to next shard
+            self.current_shard += 1;
+            self.current_idx = 0;
         }
-        self.guard = None;
+
         None
     }
 }

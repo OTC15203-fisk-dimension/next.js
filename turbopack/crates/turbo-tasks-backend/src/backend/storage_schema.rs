@@ -181,6 +181,11 @@ struct TaskStorageSchema {
     #[field(storage = "flag", category = "transient")]
     prefetched: bool,
 
+    /// Whether this task is new and needs its type persisted to the task cache.
+    /// Set when task is created, cleared after persisting.
+    #[field(storage = "flag", category = "transient")]
+    new_persistent_task: bool,
+
     // =========================================================================
     // CHILDREN & AGGREGATION (meta)
     // =========================================================================
@@ -538,6 +543,21 @@ impl TaskStorage {
             done_event,
             reason: TaskExecutionReason::Initial,
         });
+    }
+
+    /// Initialize a new persistent task with the given task type.
+    ///
+    /// This sets the persistent task type, marks it as new (needs cache persistence),
+    /// and marks both categories as restored (since there's no prior data on disk).
+    ///
+    /// This method sets fields directly on TaskStorage and does NOT trigger
+    /// `track_modification`. The caller must call `track_modification` after this
+    /// to ensure the task appears in the modified list for snapshot persistence.
+    pub fn init_new_persistent_task(&mut self, task_type: Arc<CachedTaskType>) {
+        self.persistent_task_type = Some(task_type);
+        self.flags.set_new_persistent_task(true);
+        // This is a new task, just set the restored flags so we don't attempt any lookups.
+        self.flags.set_restored(TaskDataCategory::All);
     }
 
     /// Returns counts for aggregation tree and collectibles fields.
