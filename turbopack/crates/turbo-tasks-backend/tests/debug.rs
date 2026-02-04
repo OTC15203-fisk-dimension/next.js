@@ -4,6 +4,7 @@
 
 use std::sync::Mutex;
 
+use anyhow::Result;
 use turbo_tasks::{ResolvedVc, Vc, debug::ValueDebug};
 use turbo_tasks_testing::{Registration, register, run_once};
 
@@ -61,19 +62,27 @@ async fn enum_transparent_debug() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn enum_inner_vc_debug() {
+async fn test_enum_inner_vc_debug() {
     run_once(&REGISTRATION, || async {
-        let a: Vc<Enum> = Enum::Enum(Enum::None.resolved_cell()).cell();
-        assert_eq!(
-            format!("{:?}", a.dbg().await?),
-            r#"Enum :: Enum(
-    Enum :: None,
-)"#
-        );
+        test_enum_inner_vc_debug_operation()
+            .read_strongly_consistent()
+            .await?;
         anyhow::Ok(())
     })
     .await
     .unwrap()
+}
+
+#[turbo_tasks::function(operation)]
+async fn test_enum_inner_vc_debug_operation() -> Result<Vc<()>> {
+    let a: Vc<Enum> = Enum::Enum(Enum::None.resolved_cell()).cell();
+    assert_eq!(
+        format!("{:?}", a.dbg().await?),
+        r#"Enum :: Enum(
+    Enum :: None,
+)"#
+    );
+    Ok(Vc::cell(()))
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
