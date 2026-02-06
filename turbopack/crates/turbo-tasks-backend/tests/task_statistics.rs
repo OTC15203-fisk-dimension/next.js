@@ -8,7 +8,7 @@ use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::json;
-use turbo_tasks::Vc;
+use turbo_tasks::{Vc, unmark_root_task};
 use turbo_tasks_testing::{Registration, register, run_without_cache_check};
 
 static REGISTRATION: Registration = register!();
@@ -16,6 +16,7 @@ static REGISTRATION: Registration = register!();
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_simple_task() -> Result<()> {
     run_without_cache_check(&REGISTRATION, async move {
+        unmark_root_task();
         enable_stats();
         for i in 0..10 {
             double(i).await.unwrap();
@@ -42,6 +43,7 @@ async fn test_simple_task() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_await_same_vc_multiple_times() -> Result<()> {
     run_without_cache_check(&REGISTRATION, async move {
+        unmark_root_task();
         enable_stats();
         let dvc = double(0);
         // this is awaited multiple times, but only resolved once
@@ -64,6 +66,7 @@ async fn test_await_same_vc_multiple_times() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_vc_receiving_task() -> Result<()> {
     run_without_cache_check(&REGISTRATION, async move {
+        unmark_root_task();
         enable_stats();
         for i in 0..10 {
             let dvc = double(i);
@@ -96,6 +99,7 @@ async fn test_vc_receiving_task() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trait_methods() -> Result<()> {
     run_without_cache_check(&REGISTRATION, async move {
+        unmark_root_task();
         enable_stats();
         for i in 0..10 {
             let wvc = wrap(i);
@@ -133,6 +137,7 @@ async fn test_trait_methods() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_dyn_trait_methods() -> Result<()> {
     run_without_cache_check(&REGISTRATION, async move {
+        unmark_root_task();
         enable_stats();
         for i in 0..10 {
             let wvc: Vc<Box<dyn Doublable>> = Vc::upcast(wrap(i));
@@ -177,6 +182,7 @@ async fn test_dyn_trait_methods() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_no_execution() -> Result<()> {
     run_without_cache_check(&REGISTRATION, async move {
+        unmark_root_task();
         enable_stats();
         wrap_vc(double_vc(double(123)))
             .double()

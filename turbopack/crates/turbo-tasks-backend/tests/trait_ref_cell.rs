@@ -5,7 +5,9 @@
 use std::{collections::HashSet, mem::take, sync::Mutex};
 
 use anyhow::Result;
-use turbo_tasks::{IntoTraitRef, Invalidator, TraitRef, Vc, get_invalidator, with_turbo_tasks};
+use turbo_tasks::{
+    IntoTraitRef, Invalidator, TraitRef, Vc, get_invalidator, unmark_root_task, with_turbo_tasks,
+};
 use turbo_tasks_testing::{Registration, register, run_once};
 
 static REGISTRATION: Registration = register!();
@@ -13,6 +15,7 @@ static REGISTRATION: Registration = register!();
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn trait_ref() {
     run_once(&REGISTRATION, || async {
+        unmark_root_task();
         let counter = Counter::cell(Counter {
             value: Mutex::new((0, Default::default())),
         });

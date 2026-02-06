@@ -4,7 +4,9 @@
 
 use anyhow::{Result, bail};
 use turbo_rcstr::RcStr;
-use turbo_tasks::{CollectiblesSource, ResolvedVc, State, ValueToString, Vc, emit};
+use turbo_tasks::{
+    CollectiblesSource, ResolvedVc, State, ValueToString, Vc, emit, unmark_root_task,
+};
 use turbo_tasks_testing::{Registration, register, run_once};
 
 static REGISTRATION: Registration = register!();
@@ -12,6 +14,7 @@ static REGISTRATION: Registration = register!();
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn recompute() {
     run_once(&REGISTRATION, || async {
+        unmark_root_task();
         let input = ChangingInput::new(1).resolve().await?;
         let input2 = ChangingInput::new(2).resolve().await?;
         input.await?.state.set(1);

@@ -2,7 +2,7 @@
 #![feature(arbitrary_self_types_pointers)]
 
 use anyhow::Result;
-use turbo_tasks::{IntoTraitRef, State, TraitRef, Upcast, Vc};
+use turbo_tasks::{IntoTraitRef, State, TraitRef, Upcast, Vc, unmark_root_task};
 use turbo_tasks_testing::{Registration, register, run_once};
 
 static REGISTRATION: Registration = register!();
@@ -12,6 +12,7 @@ static REGISTRATION: Registration = register!();
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trait_ref_shared_cell_mode() {
     run_once(&REGISTRATION, || async {
+        unmark_root_task();
         let input = CellIdSelector {
             value: 42,
             cell_idx: State::new(0),
@@ -47,6 +48,7 @@ async fn test_trait_ref_shared_cell_mode() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trait_ref_new_cell_mode() {
     run_once(&REGISTRATION, || async {
+        unmark_root_task();
         let input = CellIdSelector {
             value: 42,
             cell_idx: State::new(0),
