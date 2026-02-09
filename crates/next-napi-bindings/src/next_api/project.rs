@@ -36,9 +36,9 @@ use tracing::Instrument;
 use tracing_subscriber::{Registry, layer::SubscriberExt, util::SubscriberInitExt};
 use turbo_rcstr::{RcStr, rcstr};
 use turbo_tasks::{
-    Effects, FxIndexSet, NonLocalValue, OperationValue, OperationVc, PrettyPrintError, ReadRef,
-    ResolvedVc, TaskInput, TransientInstance, TryJoinIterExt, TurboTasksApi, UpdateInfo, Vc,
-    get_effects,
+    Completion, Effects, FxIndexSet, NonLocalValue, OperationValue, OperationVc, PrettyPrintError,
+    ReadRef, ResolvedVc, TaskInput, TransientInstance, TryJoinIterExt, TurboTasksApi, UpdateInfo,
+    Vc, get_effects,
     message_queue::{CompilationEvent, Severity},
     trace::TraceRawVcs,
 };
@@ -90,6 +90,41 @@ static SOURCE_MAP_PREFIX_PROJECT: Lazy<String> =
 /// Next doesn't display warnings from node_modules, so configure turbopack to not report them
 /// either. This matches logic in `packages/next/src/server/dev/turbopack-utils.ts`
 pub const NEXT_ISSUE_FILTER: IssueFilter = IssueFilter::warnings_and_foreign_errors();
+
+#[turbo_tasks::function(operation)]
+async fn project_new_operation(
+    is_dev: bool,
+    options: ProjectOptions,
+) -> Result<Vc<ProjectContainer>> {
+    let project = ProjectContainer::new(rcstr!("next.js"), is_dev)
+        .to_resolved()
+        .await?;
+    project.initialize(options).await?;
+    Ok(*project)
+}
+
+#[turbo_tasks::function(operation)]
+async fn project_update_operation(
+    container: ResolvedVc<ProjectContainer>,
+    options: PartialProjectOptions,
+) -> Result<Vc<Completion>> {
+    container.update(options).await?;
+    Ok(Completion::new())
+}
+
+#[turbo_tasks::function(operation)]
+fn project_node_root_operation(container: ResolvedVc<ProjectContainer>) -> Vc<FileSystemPath> {
+    container.project().node_root()
+}
+
+#[turbo_tasks::function(operation)]
+async fn source_content_operation(
+    container: ResolvedVc<ProjectContainer>,
+    file_path: RcStr,
+) -> Result<Vc<FileContent>> {
+    let project_path = container.project().project_path().await?;
+    Ok(project_path.fs().root().await?.join(&file_path)?.read())
+}
 
 #[napi(object)]
 #[derive(Clone, Debug)]
@@ -542,10 +577,9 @@ pub fn project_new(
             let is_dev = options.dev;
             let container = turbo_tasks
                 .run(async move {
-                    let project = ProjectContainer::new(rcstr!("next.js"), is_dev);
-                    let project = project.to_resolved().await?;
-                    project.initialize(options).await?;
-                    Ok(project)
+                    project_new_operation(is_dev, options)
+                        .resolve_strongly_consistent()
+                        .await
                 })
                 .or_else(|e| turbopack_ctx.throw_turbopack_internal_result(&e.into()))
                 .await?;
@@ -557,11 +591,10 @@ pub fn project_new(
                         let result = tt
                             .clone()
                             .run(async move {
-                                benchmark_file_io(
-                                    tt,
-                                    container.project().node_root().owned().await?,
-                                )
-                                .await
+                                let directory = project_node_root_operation(container)
+                                    .read_strongly_consistent()
+                                    .await?;
+                                benchmark_file_io(&tt, &directory).await
                             })
                             .await;
                         if let Err(err) = result {
@@ -620,7 +653,7 @@ impl CompilationEvent for SlowFilesystemEvent {
 /// This idea is copied from Bun:
 /// - https://x.com/jarredsumner/status/1637549427677364224
 /// - https://github.com/oven-sh/bun/blob/06a9aa80c38b08b3148bfeabe560/src/install/install.zig#L3038
-async fn benchmark_file_io(turbo_tasks: NextTurboTasks, directory: FileSystemPath) -> Result<()> {
+async fn benchmark_file_io(turbo_tasks: &NextTurboTasks, directory: &FileSystemPath) -> Result<()> {
     // try to get the real file path on disk so that we can use it with tokio
     let fs = ResolvedVc::try_downcast_type::<DiskFileSystem>(directory.fs)
         .context(anyhow!(
@@ -628,7 +661,7 @@ async fn benchmark_file_io(turbo_tasks: NextTurboTasks, directory: FileSystemPat
         ))?
         .await?;
 
-    let directory = fs.to_sys_path(&directory);
+    let directory = fs.to_sys_path(directory);
     let temp_path = directory.join(format!(
         "tmp_file_io_benchmark_{:x}",
         rand::random::<u128>()
@@ -679,7 +712,9 @@ pub async fn project_update(
     let container = project.container;
     ctx.turbo_tasks()
         .run(async move {
-            container.update(options).await?;
+            let _ = project_update_operation(container, options)
+                .read_strongly_consistent()
+                .await?;
             Ok(())
         })
         .or_else(|e| ctx.throw_turbopack_internal_result(&e.into()))
@@ -1771,15 +1806,8 @@ pub async fn project_get_source_for_asset(
     let ctx = &project.turbopack_ctx;
     ctx.turbo_tasks()
         .run(async move {
-            let source_content = &*container
-                .project()
-                .project_path()
-                .await?
-                .fs()
-                .root()
-                .await?
-                .join(&file_path)?
-                .read()
+            let source_content = &*source_content_operation(container, file_path.clone())
+                .read_strongly_consistent()
                 .await?;
 
             let FileContent::Content(source_content) = source_content else {
