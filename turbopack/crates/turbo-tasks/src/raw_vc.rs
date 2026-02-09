@@ -18,7 +18,7 @@ use crate::{
     event::EventListener,
     id::{ExecutionId, LocalTaskId},
     manager::{
-        ReadCellTracking, ReadTracking, SUPPRESS_EVENTUAL_CONSISTENCY_ROOT_TASK_CHECK,
+        ReadCellTracking, ReadTracking, SUPPRESS_EVENTUAL_CONSISTENCY_TOP_LEVEL_TASK_CHECK,
         TurboTasksApi, read_local_output, read_task_output, with_turbo_tasks,
     },
     registry::{self, get_value_type},
@@ -428,22 +428,22 @@ impl Future for ReadRawVcFuture {
             }
         };
 
-        fn suppress_root_task_check<R>(strongly_consistent: bool, f: impl FnOnce() -> R) -> R {
+        fn suppress_top_level_task_check<R>(strongly_consistent: bool, f: impl FnOnce() -> R) -> R {
             if strongly_consistent {
-                // Temporarily suppress the root task check
-                SUPPRESS_EVENTUAL_CONSISTENCY_ROOT_TASK_CHECK.sync_scope(true, f)
+                // Temporarily suppress the top-level task check
+                SUPPRESS_EVENTUAL_CONSISTENCY_TOP_LEVEL_TASK_CHECK.sync_scope(true, f)
             } else {
                 f()
             }
         }
 
-        // HACK: Temporarily suppress root task check if doing strongly consistent read.
+        // HACK: Temporarily suppress top-level task check if doing strongly consistent read.
         //
         // This masks a bug: There's an unlikely TOCTOU race condition in `poll_fn`. Because the
         // strongly consistent read isn't a single atomic operation, any inner `TaskOutput` or
         // `TaskCell` could get mutated after the strongly consistent read of the outer
         // `TaskOutput`.
-        suppress_root_task_check(this.strongly_consistent, || with_turbo_tasks(poll_fn))
+        suppress_top_level_task_check(this.strongly_consistent, || with_turbo_tasks(poll_fn))
     }
 }
 

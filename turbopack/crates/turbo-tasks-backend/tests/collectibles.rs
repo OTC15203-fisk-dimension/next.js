@@ -9,7 +9,10 @@ use auto_hash_map::AutoSet;
 use rustc_hash::FxHashSet;
 use tokio::time::sleep;
 use turbo_rcstr::{RcStr, rcstr};
-use turbo_tasks::{CollectiblesSource, ResolvedVc, ValueToString, Vc, emit, unmark_root_task};
+use turbo_tasks::{
+    CollectiblesSource, ResolvedVc, ValueToString, Vc, emit,
+    unmark_top_level_task_may_leak_eventually_consistent_state,
+};
 use turbo_tasks_testing::{Registration, register, run_once};
 
 static REGISTRATION: Registration = register!();
@@ -17,7 +20,7 @@ static REGISTRATION: Registration = register!();
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_transitive_emitting() {
     run_once(&REGISTRATION, || async {
-        unmark_root_task();
+        unmark_top_level_task_may_leak_eventually_consistent_state();
         let result_op = my_transitive_emitting_function(rcstr!(""), rcstr!(""));
         let result_val = result_op.connect().strongly_consistent().await?;
         let list = result_op.peek_collectibles::<Box<dyn ValueToString>>();
@@ -36,7 +39,7 @@ async fn test_transitive_emitting() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_transitive_emitting_indirect() {
     run_once(&REGISTRATION, || async {
-        unmark_root_task();
+        unmark_top_level_task_may_leak_eventually_consistent_state();
         let result_op = my_transitive_emitting_function(rcstr!(""), rcstr!(""));
         let collectibles_op = my_transitive_emitting_function_collectibles(rcstr!(""), rcstr!(""));
         let list = collectibles_op.connect().strongly_consistent().await?;
@@ -55,7 +58,7 @@ async fn test_transitive_emitting_indirect() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multi_emitting() {
     run_once(&REGISTRATION, || async {
-        unmark_root_task();
+        unmark_top_level_task_may_leak_eventually_consistent_state();
         let result_op = my_multi_emitting_function();
         let result_val = result_op.connect().strongly_consistent().await?;
         let list = result_op.peek_collectibles::<Box<dyn ValueToString>>();

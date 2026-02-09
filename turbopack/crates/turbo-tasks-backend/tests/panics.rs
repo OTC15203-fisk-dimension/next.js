@@ -13,7 +13,7 @@ use turbo_tasks::{
     Vc,
     backend::TurboTasksExecutionError,
     panic_hooks::{handle_panic, register_panic_hook},
-    unmark_root_task,
+    unmark_top_level_task_may_leak_eventually_consistent_state,
 };
 use turbo_tasks_testing::{Registration, register, run_once_without_cache_check};
 
@@ -41,7 +41,7 @@ async fn test_panic_hook() {
     });
 
     let result = run_once_without_cache_check(&REGISTRATION, async move {
-        unmark_root_task();
+        unmark_top_level_task_may_leak_eventually_consistent_state();
         anyhow::Ok(*double(3).await?)
     })
     .await;
