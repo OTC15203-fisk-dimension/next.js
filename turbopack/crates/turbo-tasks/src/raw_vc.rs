@@ -160,10 +160,12 @@ impl RawVc {
 
     /// See [`crate::Vc::resolve_strongly_consistent`].
     pub(crate) async fn resolve_strongly_consistent(self) -> Result<RawVc> {
-        self.resolve_inner(ReadOutputOptions {
-            consistency: ReadConsistency::Strong,
-            ..Default::default()
-        })
+        SuppressTopLevelTaskCheckFuture {
+            inner: self.resolve_inner(ReadOutputOptions {
+                consistency: ReadConsistency::Strong,
+                ..Default::default()
+            }),
+        }
         .await
     }
 
@@ -289,6 +291,24 @@ impl CollectiblesSource for RawVc {
         let tt = turbo_tasks();
         let map = tt.read_task_collectibles(task_id, T::get_trait_type_id());
         tt.unemit_collectibles(T::get_trait_type_id(), &map);
+    }
+}
+
+/// A future wrapper that suppresses the top-level task eventual consistency check
+/// during each [`poll`][Future::poll] call. The suppression is applied via
+/// [`sync_scope`][tokio::task_local!] so it is only active during the synchronous
+/// execution of the inner future's `poll`, and is never held across await points.
+struct SuppressTopLevelTaskCheckFuture<F> {
+    inner: F,
+}
+
+impl<F: Future> Future for SuppressTopLevelTaskCheckFuture<F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        // SAFETY: we are only projecting the pin to the inner field, not moving it
+        let inner = unsafe { self.map_unchecked_mut(|this| &mut this.inner) };
+        SUPPRESS_EVENTUAL_CONSISTENCY_TOP_LEVEL_TASK_CHECK.sync_scope(true, || inner.poll(cx))
     }
 }
 
