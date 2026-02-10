@@ -8,6 +8,7 @@ use std::{str::FromStr, time::Instant};
 use anyhow::{Context, Result};
 use futures_util::{StreamExt, TryStreamExt};
 use next_api::{
+    entrypoints::Entrypoints,
     project::{ProjectContainer, ProjectOptions},
     route::{Endpoint, EndpointOutputPaths, Route, endpoint_write_to_disk},
 };
@@ -15,6 +16,25 @@ use turbo_rcstr::{RcStr, rcstr};
 use turbo_tasks::{ReadConsistency, ResolvedVc, TransientInstance, TurboTasks, Vc, get_effects};
 use turbo_tasks_backend::{NoopBackingStorage, TurboTasksBackend};
 use turbo_tasks_malloc::TurboMalloc;
+
+#[turbo_tasks::function(operation)]
+async fn init_project_operation(options: ProjectOptions) -> Result<Vc<ProjectContainer>> {
+    let project = ProjectContainer::new(rcstr!("next-build-test"), options.dev)
+        .to_resolved()
+        .await?;
+    project.initialize(options).await?;
+    Ok(*project)
+}
+
+#[turbo_tasks::function(operation)]
+fn project_entrypoints_operation(project: ResolvedVc<ProjectContainer>) -> Vc<Entrypoints> {
+    project.entrypoints()
+}
+
+#[turbo_tasks::function(operation)]
+fn project_hmr_identifiers_operation(project: ResolvedVc<ProjectContainer>) -> Vc<Vec<RcStr>> {
+    project.hmr_identifiers()
+}
 
 pub async fn main_inner(
     tt: &TurboTasks<TurboTasksBackend<NoopBackingStorage>>,
@@ -39,15 +59,20 @@ pub async fn main_inner(
 
     let project = tt
         .run(async {
-            let project = ProjectContainer::new(rcstr!("next-build-test"), options.dev);
-            let project = project.to_resolved().await?;
-            project.initialize(options).await?;
-            Ok(project)
+            init_project_operation(options)
+                .resolve_strongly_consistent()
+                .await
         })
         .await?;
 
     tracing::info!("collecting endpoints");
-    let entrypoints = tt.run(async move { project.entrypoints().await }).await?;
+    let entrypoints = tt
+        .run(async move {
+            project_entrypoints_operation(project)
+                .read_strongly_consistent()
+                .await
+        })
+        .await?;
 
     let mut routes = if let Some(files) = files {
         tracing::info!("building only the files:");
@@ -84,7 +109,7 @@ pub async fn main_inner(
     }
 
     if matches!(strategy, Strategy::Development { .. }) {
-        hmr(tt, *project).await?;
+        hmr(tt, project).await?;
     }
 
     Ok(())
@@ -252,12 +277,16 @@ pub fn endpoint_write_to_disk_operation(
 
 async fn hmr(
     tt: &TurboTasks<TurboTasksBackend<NoopBackingStorage>>,
-    project: Vc<ProjectContainer>,
+    project: ResolvedVc<ProjectContainer>,
 ) -> Result<()> {
     tracing::info!("HMR...");
     let session = TransientInstance::new(());
     let idents = tt
-        .run(async move { project.hmr_identifiers().await })
+        .run(async move {
+            project_hmr_identifiers_operation(project)
+                .read_strongly_consistent()
+                .await
+        })
         .await?;
     let start = Instant::now();
     for ident in idents {
@@ -268,6 +297,7 @@ async fn hmr(
         let start = Instant::now();
         let task = tt.spawn_root_task(move || {
             let session = session.clone();
+            let project = *project;
             async move {
                 let project = project.project();
                 let state = project.hmr_version_state(ident.clone(), session);
