@@ -46,7 +46,7 @@ use turbo_tasks_backend::{BackingStorage, db_invalidation::invalidation_reasons}
 use turbo_tasks_fs::{
     DiskFileSystem, FileContent, FileSystem, FileSystemPath, util::uri_from_file,
 };
-use turbo_unix_path::{get_relative_path_to, sys_to_unix};
+use turbo_unix_path::{get_relative_path_to, sys_to_unix, unix_to_sys};
 use turbopack_core::{
     PROJECT_FILESYSTEM_NAME, SOURCE_URL_PROTOCOL,
     diagnostics::PlainDiagnostic,
@@ -115,6 +115,19 @@ async fn project_update_operation(
 #[turbo_tasks::function(operation)]
 fn project_node_root_operation(container: ResolvedVc<ProjectContainer>) -> Vc<FileSystemPath> {
     container.project().node_root()
+}
+
+#[turbo_tasks::function(operation)]
+async fn project_node_root_path_operation(
+    container: ResolvedVc<ProjectContainer>,
+) -> Result<Vc<RcStr>> {
+    let directory = project_node_root_operation(container)
+        .read_strongly_consistent()
+        .await?;
+    if ResolvedVc::try_downcast_type::<DiskFileSystem>(directory.fs).is_none() {
+        bail!("expected node_root to be a DiskFileSystem, cannot benchmark");
+    }
+    Ok(Vc::cell(directory.path.clone()))
 }
 
 #[turbo_tasks::function(operation)]
@@ -575,6 +588,7 @@ pub fn project_new(
 
             let options: ProjectOptions = options.into();
             let is_dev = options.dev;
+            let benchmark_root_path = options.root_path.clone();
             let container = turbo_tasks
                 .run(async move {
                     project_new_operation(is_dev, options)
@@ -587,14 +601,15 @@ pub fn project_new(
             if is_dev {
                 Handle::current().spawn({
                     let tt = turbo_tasks.clone();
+                    let benchmark_root_path = benchmark_root_path.clone();
                     async move {
                         let result = tt
                             .clone()
                             .run(async move {
-                                let directory = project_node_root_operation(container)
+                                let directory = project_node_root_path_operation(container)
                                     .read_strongly_consistent()
                                     .await?;
-                                benchmark_file_io(&tt, &directory).await
+                                benchmark_file_io(&tt, &benchmark_root_path, &directory).await
                             })
                             .await;
                         if let Err(err) = result {
@@ -653,15 +668,15 @@ impl CompilationEvent for SlowFilesystemEvent {
 /// This idea is copied from Bun:
 /// - https://x.com/jarredsumner/status/1637549427677364224
 /// - https://github.com/oven-sh/bun/blob/06a9aa80c38b08b3148bfeabe560/src/install/install.zig#L3038
-async fn benchmark_file_io(turbo_tasks: &NextTurboTasks, directory: &FileSystemPath) -> Result<()> {
-    // try to get the real file path on disk so that we can use it with tokio
-    let fs = ResolvedVc::try_downcast_type::<DiskFileSystem>(directory.fs)
-        .context(anyhow!(
-            "expected node_root to be a DiskFileSystem, cannot benchmark"
-        ))?
-        .await?;
-
-    let directory = fs.to_sys_path(directory);
+async fn benchmark_file_io(
+    turbo_tasks: &NextTurboTasks,
+    root_path: &str,
+    node_root_path: &str,
+) -> Result<()> {
+    let mut directory = PathBuf::from(root_path);
+    if !node_root_path.is_empty() {
+        directory.push(unix_to_sys(node_root_path).as_ref());
+    }
     let temp_path = directory.join(format!(
         "tmp_file_io_benchmark_{:x}",
         rand::random::<u128>()
