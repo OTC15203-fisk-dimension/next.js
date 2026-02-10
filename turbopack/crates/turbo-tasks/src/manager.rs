@@ -1426,7 +1426,7 @@ impl<B: Backend + 'static> TurboTasksApi for TurboTasks<B> {
         options: ReadOutputOptions,
     ) -> Result<Result<RawVc, EventListener>> {
         if options.consistency == ReadConsistency::Eventual {
-            assert_not_in_top_level_task("read_task_output");
+            debug_assert_not_in_top_level_task("read_task_output");
         }
         self.backend.try_read_task_output(
             task,
@@ -1443,7 +1443,7 @@ impl<B: Backend + 'static> TurboTasksApi for TurboTasks<B> {
         index: CellId,
         options: ReadCellOptions,
     ) -> Result<Result<TypedCellContent, EventListener>> {
-        assert_not_in_top_level_task("read_task_cell");
+        debug_assert_not_in_top_level_task("read_task_cell");
         self.backend.try_read_task_cell(
             task,
             index,
@@ -1469,7 +1469,7 @@ impl<B: Backend + 'static> TurboTasksApi for TurboTasks<B> {
         execution_id: ExecutionId,
         local_task_id: LocalTaskId,
     ) -> Result<Result<RawVc, EventListener>> {
-        assert_not_in_top_level_task("read_local_output");
+        debug_assert_not_in_top_level_task("read_local_output");
         CURRENT_TASK_STATE.with(|gts| {
             let gts_read = gts.read().unwrap();
 
@@ -1718,12 +1718,16 @@ pub(crate) fn current_task(from: &str) -> TaskId {
 }
 
 #[track_caller]
-fn assert_not_in_top_level_task(operation: &str) {
-    // Check if the check is suppressed (e.g., during strongly consistent reads)
+fn debug_assert_not_in_top_level_task(operation: &str) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+
+    // HACK: We set this inside of `ReadRawVcFuture` to suppress warnings about an internal
+    // consistency bug
     let suppressed = SUPPRESS_EVENTUAL_CONSISTENCY_TOP_LEVEL_TASK_CHECK
         .try_with(|&suppressed| suppressed)
         .unwrap_or(false);
-
     if suppressed {
         return;
     }
@@ -1735,7 +1739,7 @@ fn assert_not_in_top_level_task(operation: &str) {
         panic!(
             "Eventually consistent read ({operation}) cannot be performed from a top-level task. \
              Top-level tasks (e.g. code inside `.run_once(...)`) must use strongly consistent \
-             reads to ensure correctness."
+             reads to avoid leaking inconsistent return values."
         );
     }
 }
