@@ -65,7 +65,7 @@ use turbopack_core::{
     output::{OutputAsset, OutputAssets, OutputAssetsWithReferenced},
     reference::all_assets_from_entries,
     reference_type::{CommonJsReferenceSubType, CssReferenceSubType, ReferenceType},
-    resolve::{origin::PlainResolveOrigin, parse::Request, pattern::Pattern},
+    resolve::{ResolveErrorMode, origin::PlainResolveOrigin, parse::Request, pattern::Pattern},
     source::Source,
     source_map::SourceMapAsset,
     virtual_output::VirtualOutputAsset,
@@ -840,7 +840,7 @@ impl AppProject {
             ))),
             CommonJsReferenceSubType::Undefined,
             None,
-            false,
+            ResolveErrorMode::Error,
         )
         .resolve()
         .await?
@@ -1577,6 +1577,7 @@ impl AppEndpoint {
 
                     let loadable_manifest_output = create_react_loadable_manifest(
                         *dynamic_import_entries,
+                        *client_chunking_context,
                         client_relative_path.clone(),
                         node_root.join(&format!(
                             "server/app{}/react-loadable-manifest",
@@ -1692,6 +1693,7 @@ impl AppEndpoint {
 
                     let loadable_manifest_output = create_react_loadable_manifest(
                         *dynamic_import_entries,
+                        *client_chunking_context,
                         client_relative_path.clone(),
                         node_root.join(&format!(
                             "server/app{}/react-loadable-manifest",
@@ -2119,6 +2121,11 @@ impl Endpoint for AppEndpoint {
             )
             .await?;
         Ok(Vc::cell(vec![module_graphs.full]))
+    }
+
+    #[turbo_tasks::function]
+    async fn project(self: Vc<Self>) -> Result<Vc<Project>> {
+        Ok(self.await?.app_project.project())
     }
 }
 

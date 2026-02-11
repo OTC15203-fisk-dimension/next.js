@@ -25,7 +25,7 @@ use next_core::{
     segment_config::ParseSegmentMode,
     util::{NextRuntime, OptionEnvMap},
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use tracing::{Instrument, field::Empty};
 use turbo_rcstr::{RcStr, rcstr};
@@ -48,7 +48,7 @@ use turbopack_core::{
     changed::content_changed,
     chunk::{
         ChunkingContext, EvaluatableAssets, UnusedReferences,
-        module_id_strategies::{DevModuleIdStrategy, ModuleIdStrategy},
+        chunk_id_strategy::{ModuleIdFallback, ModuleIdStrategy},
     },
     compile_time_info::CompileTimeInfo,
     context::AssetContext,
@@ -57,8 +57,8 @@ use turbopack_core::{
     file_source::FileSource,
     ident::Layer,
     issue::{
-        CollectibleIssuesExt, Issue, IssueExt, IssueSeverity, IssueStage, OptionStyledString,
-        StyledString,
+        CollectibleIssuesExt, Issue, IssueExt, IssueFilter, IssueSeverity, IssueStage,
+        OptionStyledString, StyledString,
     },
     module::Module,
     module_graph::{
@@ -146,6 +146,114 @@ pub struct WatchOptions {
 
 #[derive(
     Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    Clone,
+    TaskInput,
+    PartialEq,
+    Eq,
+    Hash,
+    TraceRawVcs,
+    NonLocalValue,
+    OperationValue,
+    Encode,
+    Decode,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugBuildPaths {
+    pub app: Vec<RcStr>,
+    pub pages: Vec<RcStr>,
+}
+
+/// Target for HMR operations - client-side (browser) or server-side (Node.js).
+#[derive(
+    Debug,
+    Default,
+    Copy,
+    Clone,
+    TaskInput,
+    PartialEq,
+    Eq,
+    Hash,
+    TraceRawVcs,
+    NonLocalValue,
+    Encode,
+    Decode,
+)]
+pub enum HmrTarget {
+    #[default]
+    Client,
+    Server,
+}
+
+impl std::fmt::Display for HmrTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HmrTarget::Client => write!(f, "client"),
+            HmrTarget::Server => write!(f, "server"),
+        }
+    }
+}
+
+impl std::str::FromStr for HmrTarget {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "client" => Ok(HmrTarget::Client),
+            "server" => Ok(HmrTarget::Server),
+            _ => Err(format!(
+                "Invalid HMR target: '{}'. Expected 'client' or 'server'",
+                s
+            )),
+        }
+    }
+}
+
+/// Pre-converted route keys from debug build paths for O(1) lookups.
+struct DebugBuildPathsRouteKeys {
+    app: FxHashSet<RcStr>,
+    pages: FxHashSet<RcStr>,
+}
+
+impl DebugBuildPathsRouteKeys {
+    fn from_debug_build_paths(paths: &DebugBuildPaths) -> Self {
+        Self {
+            app: paths
+                .app
+                .iter()
+                .map(|path| {
+                    // App router: "/blog/[slug]/page.tsx" -> "/blog/[slug]"
+                    if let Some(last_slash_idx) = path.rfind('/') {
+                        if last_slash_idx == 0 {
+                            "/".into() // Root: "/page.tsx" -> "/"
+                        } else {
+                            path[..last_slash_idx].into()
+                        }
+                    } else {
+                        path.clone()
+                    }
+                })
+                .collect(),
+            pages: paths
+                .pages
+                .iter()
+                .map(|path| {
+                    // Pages router: "/foo.tsx" -> "/foo"
+                    if let Some(dot_idx) = path.rfind('.') {
+                        path[..dot_idx].into()
+                    } else {
+                        path.clone()
+                    }
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(
+    Debug,
     Serialize,
     Deserialize,
     Clone,
@@ -208,6 +316,13 @@ pub struct ProjectOptions {
 
     /// The version of Node.js that is available/currently running.
     pub current_node_js_version: RcStr,
+
+    /// Debug build paths for selective builds.
+    /// When set, only routes matching these paths will be included in the build.
+    pub debug_build_paths: Option<DebugBuildPaths>,
+
+    /// Whether to enable persistent caching
+    pub is_persistent_caching_enabled: bool,
 }
 
 pub struct PartialProjectOptions {
@@ -253,6 +368,10 @@ pub struct PartialProjectOptions {
 
     /// Whether to write the route hashes manifest.
     pub write_routes_hashes_manifest: Option<bool>,
+
+    /// Debug build paths for selective builds.
+    /// When set, only routes matching these paths will be included in the build.
+    pub debug_build_paths: Option<DebugBuildPaths>,
 }
 
 #[derive(
@@ -405,6 +524,24 @@ fn define_env_diff_report(old: &DefineEnv, new: &DefineEnv) -> String {
     report
 }
 
+/// Checks if an app router route should be included based on pre-converted route keys.
+fn should_include_app_route(route_key: &RcStr, route_keys: &FxHashSet<RcStr>) -> bool {
+    // Special app router framework routes
+    if matches!(route_key.as_str(), "/_not-found" | "/_global-error") {
+        return true;
+    }
+    route_keys.contains(route_key)
+}
+
+/// Checks if a pages router route should be included based on pre-converted route keys.
+fn should_include_pages_route(route_key: &RcStr, route_keys: &FxHashSet<RcStr>) -> bool {
+    // Special pages router framework routes
+    if matches!(route_key.as_str(), "/_error" | "/_document" | "/_app") {
+        return true;
+    }
+    route_keys.contains(route_key)
+}
+
 impl ProjectContainer {
     pub async fn initialize(self: ResolvedVc<Self>, options: ProjectOptions) -> Result<()> {
         let span = tracing::info_span!(
@@ -467,6 +604,7 @@ impl ProjectContainer {
             browserslist_query,
             no_mangling,
             write_routes_hashes_manifest,
+            debug_build_paths,
         } = options;
 
         let resolved_self = self.to_resolved().await?;
@@ -516,6 +654,9 @@ impl ProjectContainer {
         }
         if let Some(write_routes_hashes_manifest) = write_routes_hashes_manifest {
             new_options.write_routes_hashes_manifest = write_routes_hashes_manifest;
+        }
+        if let Some(debug_build_paths) = debug_build_paths {
+            new_options.debug_build_paths = Some(debug_build_paths);
         }
 
         // TODO: Handle mode switch, should prevent mode being switched.
@@ -583,6 +724,8 @@ impl ProjectContainer {
         let no_mangling;
         let write_routes_hashes_manifest;
         let current_node_js_version;
+        let debug_build_paths;
+        let is_persistent_caching_enabled;
         {
             let options = self.options_state.get();
             let options = options
@@ -607,6 +750,8 @@ impl ProjectContainer {
             no_mangling = options.no_mangling;
             write_routes_hashes_manifest = options.write_routes_hashes_manifest;
             current_node_js_version = options.current_node_js_version.clone();
+            debug_build_paths = options.debug_build_paths.clone();
+            is_persistent_caching_enabled = options.is_persistent_caching_enabled;
         }
 
         let dist_dir = next_config.dist_dir().owned().await?;
@@ -633,6 +778,8 @@ impl ProjectContainer {
             no_mangling,
             write_routes_hashes_manifest,
             current_node_js_version,
+            debug_build_paths,
+            is_persistent_caching_enabled,
         }
         .cell())
     }
@@ -643,10 +790,10 @@ impl ProjectContainer {
         self.project().entrypoints()
     }
 
-    /// See [Project::hmr_identifiers].
+    /// See [Project::hmr_chunk_names].
     #[turbo_tasks::function]
-    pub fn hmr_identifiers(self: Vc<Self>) -> Vc<Vec<RcStr>> {
-        self.project().hmr_identifiers()
+    pub fn hmr_chunk_names(self: Vc<Self>, target: HmrTarget) -> Vc<Vec<RcStr>> {
+        self.project().hmr_chunk_names(target)
     }
 
     /// Gets a source map for a particular `file_path`. If `dev` mode is disabled, this will always
@@ -683,9 +830,9 @@ pub struct Project {
     /// E.g. `.next`
     dist_dir: RcStr,
 
-    /// The root directory of the distDir. Generally the same as `distDir` but when
-    /// `isolatedDevBuild` is true it is the parent directory of `distDir`.  This is used to
-    /// ensure that the bundler doesn't traverse into the output directory.
+    /// The root directory of the distDir. In development mode, this is the parent directory of
+    /// `distDir` since development builds use `{distDir}/dev`. This is used to ensure that the
+    /// bundler doesn't traverse into the output directory.
     dist_dir_root: RcStr,
 
     /// Filesystem watcher options.
@@ -723,6 +870,13 @@ pub struct Project {
     write_routes_hashes_manifest: bool,
 
     current_node_js_version: RcStr,
+
+    /// Debug build paths for selective builds.
+    /// When set, only routes matching these paths will be included in the build.
+    debug_build_paths: Option<DebugBuildPaths>,
+
+    /// Whether to enable persistent caching
+    is_persistent_caching_enabled: bool,
 }
 
 #[turbo_tasks::value]
@@ -932,6 +1086,21 @@ impl Project {
         *self.next_config
     }
 
+    /// Build the `IssueFilter` for this project, incorporating any
+    /// `experimental.turbopackIgnoreIssue` rules from the Next.js config.
+    #[turbo_tasks::function]
+    pub async fn issue_filter(self: Vc<Self>) -> Result<Vc<IssueFilter>> {
+        let ignore_rules = self.next_config().turbopack_ignore_issue_rules().await?;
+        Ok(IssueFilter::warnings_and_foreign_errors()
+            .with_ignore_rules(ignore_rules.to_vec())
+            .cell())
+    }
+
+    #[turbo_tasks::function]
+    pub(super) fn is_persistent_caching_enabled(&self) -> Vc<bool> {
+        Vc::cell(self.is_persistent_caching_enabled)
+    }
+
     #[turbo_tasks::function]
     pub(super) fn next_mode(&self) -> Vc<NextMode> {
         *self.mode
@@ -998,7 +1167,11 @@ impl Project {
 
     #[turbo_tasks::function]
     pub(super) fn client_compile_time_info(&self) -> Vc<CompileTimeInfo> {
-        get_client_compile_time_info(self.browserslist_query.clone(), self.define_env.client())
+        get_client_compile_time_info(
+            self.browserslist_query.clone(),
+            self.define_env.client(),
+            self.next_config.report_system_env_inlining(),
+        )
     }
 
     #[turbo_tasks::function]
@@ -1236,6 +1409,7 @@ impl Project {
             self.project_path(),
             this.define_env.nodejs(),
             self.current_node_js_version(),
+            this.next_config.report_system_env_inlining(),
         ))
     }
 
@@ -1246,6 +1420,7 @@ impl Project {
             self.project_path().owned().await?,
             this.define_env.edge(),
             self.current_node_js_version(),
+            this.next_config.report_system_env_inlining(),
         ))
     }
 
@@ -1393,7 +1568,7 @@ impl Project {
         );
         emit_event(
             "persistentCaching",
-            *config.persistent_caching_enabled().await?,
+            *self.is_persistent_caching_enabled().await?,
         );
 
         emit_event(
@@ -1445,9 +1620,16 @@ impl Project {
     pub async fn entrypoints(self: Vc<Self>) -> Result<Vc<Entrypoints>> {
         self.collect_project_feature_telemetry().await?;
 
+        let this = self.await?;
         let mut routes = FxIndexMap::default();
         let app_project = self.app_project();
         let pages_project = self.pages_project();
+
+        // Convert debug build paths to route keys once for O(1) lookups
+        let debug_build_paths_route_keys = this
+            .debug_build_paths
+            .as_ref()
+            .map(DebugBuildPathsRouteKeys::from_debug_build_paths);
 
         if let Some(app_project) = &*app_project.await? {
             let app_routes = app_project.routes();
@@ -1455,11 +1637,20 @@ impl Project {
                 app_routes
                     .await?
                     .iter()
+                    .filter(|(k, _)| {
+                        debug_build_paths_route_keys
+                            .as_ref()
+                            .is_none_or(|keys| should_include_app_route(k, &keys.app))
+                    })
                     .map(|(k, v)| (k.clone(), v.clone())),
             );
         }
 
-        for (pathname, page_route) in pages_project.routes().await?.iter() {
+        for (pathname, page_route) in pages_project.routes().await?.iter().filter(|(k, _)| {
+            debug_build_paths_route_keys
+                .as_ref()
+                .is_none_or(|keys| should_include_pages_route(k, &keys.pages))
+        }) {
             match routes.entry(pathname.clone()) {
                 Entry::Occupied(mut entry) => {
                     ConflictIssue {
@@ -1664,7 +1855,7 @@ impl Project {
     async fn middleware_endpoint(self: Vc<Self>) -> Result<Vc<Box<dyn Endpoint>>> {
         let middleware = self.find_middleware();
         let FindContextFileResult::Found(fs_path, _) = &*middleware.await? else {
-            return Ok(Vc::upcast(EmptyEndpoint::new()));
+            return Ok(Vc::upcast(EmptyEndpoint::new(self)));
         };
         let source = Vc::upcast(FileSource::new(fs_path.clone()));
         let app_dir = find_app_dir(self.project_path().owned().await?)
@@ -1848,7 +2039,7 @@ impl Project {
     ) -> Result<Vc<Box<dyn Endpoint>>> {
         let instrumentation = self.find_instrumentation();
         let FindContextFileResult::Found(fs_path, _) = &*instrumentation.await? else {
-            return Ok(Vc::upcast(EmptyEndpoint::new()));
+            return Ok(Vc::upcast(EmptyEndpoint::new(self)));
         };
         let source = Vc::upcast(FileSource::new(fs_path.clone()));
         let app_dir = find_app_dir(self.project_path().owned().await?)
@@ -1914,19 +2105,39 @@ impl Project {
         .await
     }
 
+    /// Returns the root path for HMR content based on the target.
+    /// Client uses client_relative_path, Server uses node_root.
     #[turbo_tasks::function]
-    async fn hmr_content(self: Vc<Self>, identifier: RcStr) -> Result<Vc<OptionVersionedContent>> {
+    async fn hmr_root_path(self: Vc<Self>, target: HmrTarget) -> Result<Vc<FileSystemPath>> {
+        Ok(match target {
+            HmrTarget::Client => self.client_relative_path(),
+            HmrTarget::Server => self.node_root(),
+        })
+    }
+
+    /// Get HMR content by chunk_name for the specified target.
+    #[turbo_tasks::function]
+    async fn hmr_content(
+        self: Vc<Self>,
+        chunk_name: RcStr,
+        target: HmrTarget,
+    ) -> Result<Vc<OptionVersionedContent>> {
         if let Some(map) = self.await?.versioned_content_map {
-            let content = map.get(self.client_relative_path().await?.join(&identifier)?);
+            let content = map.get(self.hmr_root_path(target).await?.join(&chunk_name)?);
             Ok(content)
         } else {
             bail!("must be in dev mode to hmr")
         }
     }
 
+    /// Get HMR version for the specified target.
     #[turbo_tasks::function]
-    async fn hmr_version(self: Vc<Self>, identifier: RcStr) -> Result<Vc<Box<dyn Version>>> {
-        let content = self.hmr_content(identifier).await?;
+    async fn hmr_version(
+        self: Vc<Self>,
+        chunk_name: RcStr,
+        target: HmrTarget,
+    ) -> Result<Vc<Box<dyn Version>>> {
+        let content = self.hmr_content(chunk_name, target).await?;
         if let Some(content) = &*content {
             Ok(content.version())
         } else {
@@ -1934,15 +2145,16 @@ impl Project {
         }
     }
 
-    /// Get the version state for a session. Initialized with the first seen
+    /// Get the version state for an HMR session. Initialized with the first seen
     /// version in that session.
     #[turbo_tasks::function]
     pub async fn hmr_version_state(
         self: Vc<Self>,
-        identifier: RcStr,
+        chunk_name: RcStr,
+        target: HmrTarget,
         session: TransientInstance<()>,
     ) -> Result<Vc<VersionState>> {
-        let version = self.hmr_version(identifier);
+        let version = self.hmr_version(chunk_name, target);
 
         // The session argument is important to avoid caching this function between
         // sessions.
@@ -1963,15 +2175,16 @@ impl Project {
     }
 
     /// Emits opaque HMR events whenever a change is detected in the chunk group
-    /// internally known as `identifier`.
+    /// internally known as `chunk_name` for the specified target.
     #[turbo_tasks::function]
     pub async fn hmr_update(
         self: Vc<Self>,
-        identifier: RcStr,
+        chunk_name: RcStr,
+        target: HmrTarget,
         from: Vc<VersionState>,
     ) -> Result<Vc<Update>> {
         let from = from.get();
-        let content = self.hmr_content(identifier).await?;
+        let content = self.hmr_content(chunk_name, target).await?;
         if let Some(content) = *content {
             Ok(content.update(from))
         } else {
@@ -1979,12 +2192,13 @@ impl Project {
         }
     }
 
-    /// Gets a list of all HMR identifiers that can be subscribed to. This is
-    /// only needed for testing purposes and isn't used in real apps.
+    /// Gets a list of all HMR chunk names that can be subscribed to for the
+    /// specified target. This is only needed for testing purposes and isn't
+    /// used in real apps.
     #[turbo_tasks::function]
-    pub async fn hmr_identifiers(self: Vc<Self>) -> Result<Vc<Vec<RcStr>>> {
+    pub async fn hmr_chunk_names(self: Vc<Self>, target: HmrTarget) -> Result<Vc<Vec<RcStr>>> {
         if let Some(map) = self.await?.versioned_content_map {
-            Ok(map.keys_in_path(self.client_relative_path().owned().await?))
+            Ok(map.keys_in_path(self.hmr_root_path(target).owned().await?))
         } else {
             bail!("must be in dev mode to hmr")
         }
@@ -2024,15 +2238,17 @@ impl Project {
 
     /// Gets the module id strategy for the project.
     #[turbo_tasks::function]
-    pub async fn module_ids(self: Vc<Self>) -> Result<Vc<Box<dyn ModuleIdStrategy>>> {
+    pub async fn module_ids(self: Vc<Self>) -> Result<Vc<ModuleIdStrategy>> {
         let module_id_strategy = *self.next_config().module_ids(self.next_mode()).await?;
         match module_id_strategy {
-            ModuleIdStrategyConfig::Named => Ok(Vc::upcast(DevModuleIdStrategy::new())),
+            ModuleIdStrategyConfig::Named => Ok(ModuleIdStrategy {
+                module_id_map: None,
+                fallback: ModuleIdFallback::Ident,
+            }
+            .cell()),
             ModuleIdStrategyConfig::Deterministic => {
                 let module_graphs = self.whole_app_module_graphs().await?;
-                Ok(Vc::upcast(get_global_module_id_strategy(
-                    *module_graphs.full,
-                )))
+                Ok(get_global_module_id_strategy(*module_graphs.full))
             }
         }
     }
