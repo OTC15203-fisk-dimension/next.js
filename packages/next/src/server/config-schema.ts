@@ -325,11 +325,9 @@ export const experimentalSchema = {
   turbopackClientSideNestedAsyncChunking: z.boolean().optional(),
   turbopackServerSideNestedAsyncChunking: z.boolean().optional(),
   turbopackImportTypeBytes: z.boolean().optional(),
-  turbopackImportTypeText: z.boolean().optional(),
   turbopackUseBuiltinBabel: z.boolean().optional(),
   turbopackUseBuiltinSass: z.boolean().optional(),
   turbopackModuleIds: z.enum(['named', 'deterministic']).optional(),
-  turbopackInferModuleSideEffects: z.boolean().optional(),
   turbopackIgnoreIssue: z
     .array(
       z.object({
@@ -339,6 +337,7 @@ export const experimentalSchema = {
       })
     )
     .optional(),
+  turbopackInferModuleSideEffects: z.boolean().optional(),
   optimizePackageImports: z.array(z.string()).optional(),
   optimizeServerReact: z.boolean().optional(),
   strictRouteTypes: z.boolean().optional(),
@@ -359,6 +358,7 @@ export const experimentalSchema = {
   serverComponentsHmrCache: z.boolean().optional(),
   authInterrupts: z.boolean().optional(),
   useCache: z.boolean().optional(),
+  useNodeStreams: z.boolean().optional(),
   slowModuleDetection: z
     .object({
       buildTimeThresholdMs: z.number().int(),
