@@ -477,7 +477,6 @@ async fn process_content(
                             }
                             .resolved_cell()
                             .emit();
-                            return Ok(ParseCssResult::Unparsable.cell());
                         }
 
                         _ => {
@@ -485,6 +484,11 @@ async fn process_content(
                         }
                     }
                 }
+
+                // Save a copy before minify, since minify modifies the
+                // stylesheet in place and may fail on recovered CSS.
+                let pre_minify =
+                    stylesheet_into_static(&ss, without_warnings(config.clone()));
 
                 let targets =
                     *get_lightningcss_browser_targets(environment.as_deref().copied(), true)
@@ -515,10 +519,12 @@ async fn process_content(
                     }
                     .resolved_cell()
                     .emit();
-                    return Ok(ParseCssResult::Unparsable.cell());
+                    // Use the pre-minify stylesheet so the recovered CSS
+                    // still makes it into the output.
+                    pre_minify
+                } else {
+                    stylesheet_into_static(&ss, without_warnings(config.clone()))
                 }
-
-                stylesheet_into_static(&ss, without_warnings(config.clone()))
             }
             Err(e) => {
                 let source = match &e.loc {
