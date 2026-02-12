@@ -817,14 +817,6 @@ describe.each([
         await expect(browser).toDisplayRedbox(`
          [
            {
-             "description": "Missing <html> and <body> tags in the root layout.
-         Read more at https://nextjs.org/docs/messages/missing-root-layout-tags",
-             "environmentLabel": null,
-             "label": "Runtime Error",
-             "source": null,
-             "stack": [],
-           },
-           {
              "description": "Route "/suspense-in-root/static/invalid-client-error-in-parent-sibling": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to the following error.",
              "environmentLabel": "Server",
              "label": "Console Error",
@@ -841,6 +833,14 @@ describe.each([
              "stack": [
                "ErrorInSSR app/suspense-in-root/static/invalid-client-error-in-parent-sibling/client.tsx (5:11)",
              ],
+           },
+           {
+             "description": "Missing <html> and <body> tags in the root layout.
+         Read more at https://nextjs.org/docs/messages/missing-root-layout-tags",
+             "environmentLabel": null,
+             "label": "Runtime Error",
+             "source": null,
+             "stack": [],
            },
          ]
         `)

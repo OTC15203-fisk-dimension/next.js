@@ -243,7 +243,6 @@ import { createNodeStreamWithLateRelease } from './instant-validation/stream-uti
 // NOTE: Only use this for types, access implementations via ComponentMod
 import type * as InstantValidation from './instant-validation/instant-validation'
 import { createValidationBoundaryTracking } from './instant-validation/boundary-tracking'
-import { InstantValidationBoundaryTrackingContext } from './instant-validation/boundary-tracking-context.external'
 
 export type GetDynamicParamFromSegment = (
   // The LoaderTree to extract the dynamic param from
@@ -4315,6 +4314,9 @@ async function validateInstantConfigNavigation(
   const preinitScripts = () => {}
   const { ServerInsertedHTMLProvider } = createServerInsertedHTML()
 
+  const dynamicValidation = createInstantValidationState()
+  const boundaryState = createValidationBoundaryTracking()
+
   const finalClientPrerenderStore: PrerenderStore = {
     type: 'prerender-client',
     phase: 'render',
@@ -4337,10 +4339,8 @@ async function validateInstantConfigNavigation(
     hmrRefreshHash,
     // We don't need to track vary params during validation.
     varyParamsAccumulator: null,
+    boundaryState,
   }
-
-  const dynamicValidation = createInstantValidationState()
-  const boundaryState = createValidationBoundaryTracking()
 
   const clientReferenceManifest = getClientReferenceManifest()
 
@@ -4386,19 +4386,16 @@ async function validateInstantConfigNavigation(
             finalClientPrerenderStore,
             prerender,
             // eslint-disable-next-line @next/internal/no-ambiguous-jsx -- React Client
-            <InstantValidationBoundaryTrackingContext value={boundaryState}>
-              {/* eslint-disable-next-line @next/internal/no-ambiguous-jsx -- React Client */}
-              <App
-                reactServerStream={serverStream}
-                reactDebugStream={debugStream ?? undefined}
-                // Debug info is already filtered when constructing the combined payload.
-                debugEndTime={undefined}
-                preinitScripts={preinitScripts}
-                ServerInsertedHTMLProvider={ServerInsertedHTMLProvider}
-                nonce={nonce}
-                images={ctx.renderOpts.images}
-              />
-            </InstantValidationBoundaryTrackingContext>,
+            <App
+              reactServerStream={serverStream}
+              reactDebugStream={debugStream ?? undefined}
+              // Debug info is already filtered when constructing the combined payload.
+              debugEndTime={undefined}
+              preinitScripts={preinitScripts}
+              ServerInsertedHTMLProvider={ServerInsertedHTMLProvider}
+              nonce={nonce}
+              images={ctx.renderOpts.images}
+            />,
             {
               signal: clientReactController.signal,
               onError: (err: unknown, errorInfo: ErrorInfo) => {
