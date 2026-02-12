@@ -769,6 +769,105 @@ describe.each([
       })
     })
 
+    describe('client errors', () => {
+      it('unable to validate - client error in parent blocks children', async () => {
+        const browser = await navigateTo(
+          '/suspense-in-root/static/invalid-client-error-in-parent-blocks-children'
+        )
+        await expect(browser).toDisplayCollapsedRedbox(`
+         [
+           {
+             "description": "Route "/suspense-in-root/static/invalid-client-error-in-parent-blocks-children": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to the following error.",
+             "environmentLabel": "Server",
+             "label": "Console Error",
+             "source": null,
+             "stack": [],
+           },
+           {
+             "description": "No SSR please",
+             "environmentLabel": "Server",
+             "label": "Console Error",
+             "source": "app/suspense-in-root/static/invalid-client-error-in-parent-blocks-children/client.tsx (5:11) @ ErrorInSSR
+         > 5 |     throw new Error('No SSR please')
+             |           ^",
+             "stack": [
+               "ErrorInSSR app/suspense-in-root/static/invalid-client-error-in-parent-blocks-children/client.tsx (5:11)",
+             ],
+           },
+           {
+             "description": "Switched to client rendering because the server rendering errored:
+
+         No SSR please",
+             "environmentLabel": null,
+             "label": "Recoverable Error",
+             "source": "app/suspense-in-root/static/invalid-client-error-in-parent-blocks-children/client.tsx (5:11) @ ErrorInSSR
+         > 5 |     throw new Error('No SSR please')
+             |           ^",
+             "stack": [
+               "ErrorInSSR app/suspense-in-root/static/invalid-client-error-in-parent-blocks-children/client.tsx (5:11)",
+             ],
+           },
+         ]
+        `)
+      })
+      it('unable to validate - client error from sibling of children slot without suspense', async () => {
+        const browser = await navigateTo(
+          '/suspense-in-root/static/invalid-client-error-in-parent-sibling'
+        )
+        await expect(browser).toDisplayRedbox(`
+         [
+           {
+             "description": "Missing <html> and <body> tags in the root layout.
+         Read more at https://nextjs.org/docs/messages/missing-root-layout-tags",
+             "environmentLabel": null,
+             "label": "Runtime Error",
+             "source": null,
+             "stack": [],
+           },
+           {
+             "description": "Route "/suspense-in-root/static/invalid-client-error-in-parent-sibling": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to the following error.",
+             "environmentLabel": "Server",
+             "label": "Console Error",
+             "source": null,
+             "stack": [],
+           },
+           {
+             "description": "No SSR please",
+             "environmentLabel": "Server",
+             "label": "Console Error",
+             "source": "app/suspense-in-root/static/invalid-client-error-in-parent-sibling/client.tsx (5:11) @ ErrorInSSR
+         > 5 |     throw new Error('No SSR please')
+             |           ^",
+             "stack": [
+               "ErrorInSSR app/suspense-in-root/static/invalid-client-error-in-parent-sibling/client.tsx (5:11)",
+             ],
+           },
+         ]
+        `)
+      })
+      it('valid - client error from sibling of children slot with suspense', async () => {
+        const browser = await navigateTo(
+          '/suspense-in-root/static/valid-client-error-in-parent-does-not-block-validation'
+        )
+        // We expect to only see the error coming from react.
+        await expect(browser).toDisplayCollapsedRedbox(`
+         {
+           "description": "Switched to client rendering because the server rendering errored:
+
+         No SSR please",
+           "environmentLabel": null,
+           "label": "Recoverable Error",
+           "source": "app/suspense-in-root/static/valid-client-error-in-parent-does-not-block-validation/client.tsx (5:11) @ ErrorInSSR
+         > 5 |     throw new Error('No SSR please')
+             |           ^",
+           "stack": [
+             "ErrorInSSR app/suspense-in-root/static/valid-client-error-in-parent-does-not-block-validation/client.tsx (5:11)",
+           ],
+         }
+        `)
+      })
+    })
+
     describe('disabling validation', () => {
       it('in a layout', async () => {
         const browser = await navigateTo(

@@ -96,6 +96,15 @@ export default async function Page() {
         <li>
           <DebugLinks href="/suspense-in-root/static/valid-client-data-does-not-block-validation" />
         </li>
+        <li>
+          <DebugLinks href="/suspense-in-root/static/invalid-client-error-in-parent-blocks-children" />
+        </li>
+        <li>
+          <DebugLinks href="/suspense-in-root/static/invalid-client-error-in-parent-sibling" />
+        </li>
+        <li>
+          <DebugLinks href="/suspense-in-root/static/valid-client-error-in-parent-does-not-block-validation" />
+        </li>
       </ul>
 
       <h2>Disable Validation</h2>

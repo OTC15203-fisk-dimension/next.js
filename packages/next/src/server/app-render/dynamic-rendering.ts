@@ -888,6 +888,50 @@ export function trackDynamicHoleInNavigation(
   return
 }
 
+export function trackErrorInNavigation(
+  possibleValidationBlockingErrors: unknown[],
+  error: unknown,
+  componentStack: string
+) {
+  // If we see a validation boundary on the component stack,
+  // this error couldn't have blocked a validation boundary from rendering.
+  if (hasPrefetchValidationBoundaryRegex.test(componentStack)) {
+    return
+  }
+  possibleValidationBlockingErrors.push(error)
+}
+
+export function getValidationPreventedReasons(
+  workStore: WorkStore,
+  possibleValidationBlockingErrors: unknown[],
+  boundaryState: ValidationBoundaryTracking
+): Error[] {
+  if (boundaryState.renderedIds.size < boundaryState.expectedIds.size) {
+    if (possibleValidationBlockingErrors.length === 0) {
+      return [
+        new Error(
+          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering for an unknown reason.`
+        ),
+      ]
+    } else if (possibleValidationBlockingErrors.length === 1) {
+      return [
+        new Error(
+          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to the following error.`
+        ),
+        possibleValidationBlockingErrors[0] as Error,
+      ]
+    } else {
+      return [
+        new Error(
+          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to one of the following errors.`
+        ),
+        ...(possibleValidationBlockingErrors as Error[]),
+      ]
+    }
+  }
+  return []
+}
+
 export function trackDynamicHoleInRuntimeShell(
   workStore: WorkStore,
   componentStack: string,
@@ -1161,9 +1205,6 @@ export function getNavigationDisallowedDynamicReasons(
   // NOTE: We don't care about Suspense above body here,
   // we're only concerned with the validation boundary
   if (prelude !== PreludeState.Full) {
-    // We didn't have any sync bailouts but there may be user code which
-    // blocked the root. We would have captured these during the prerender
-    // and can log them here and then terminate the build/validating render
     const dynamicErrors = dynamicValidation.dynamicErrors
     if (dynamicErrors.length > 0) {
       return dynamicErrors
@@ -1179,11 +1220,9 @@ export function getNavigationDisallowedDynamicReasons(
         return []
       }
       // If we ever get this far then we messed up the tracking of invalid dynamic.
-      // We still adhere to the constraint that you must produce a shell but invite the
-      // user to report this as a bug in Next.js.
       return [
         new InvariantError(
-          `Route "${workStore.route}" did not produce a static shell and Next.js was unable to determine a reason.`
+          `Route "${workStore.route}" failed to render during instant validation and Next.js was unable to determine a reason.`
         ),
       ]
     }

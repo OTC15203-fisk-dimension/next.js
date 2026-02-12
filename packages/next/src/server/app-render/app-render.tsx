@@ -142,6 +142,8 @@ import {
   getNavigationDisallowedDynamicReasons,
   trackDynamicHoleInNavigation,
   DynamicHoleKind,
+  trackErrorInNavigation,
+  getValidationPreventedReasons,
 } from './dynamic-rendering'
 import {
   getClientComponentLoaderMetrics,
@@ -4338,11 +4340,12 @@ async function validateInstantConfigNavigation(
   }
 
   const dynamicValidation = createDynamicValidationState()
+  const boundaryState = createValidationBoundaryTracking()
+  const possibleValidationBlockingErrors: unknown[] = []
 
   const clientReferenceManifest = getClientReferenceManifest()
 
   const usedSegmentKinds = new Set<InstantValidation.SegmentStage>()
-  const boundaryState = createValidationBoundaryTracking()
   const { stream: serverStream, debugStream } =
     await createCombinedPayloadStream(
       (extraChunksReleaseSignal) =>
@@ -4416,6 +4419,15 @@ async function validateInstantConfigNavigation(
                     )
                   }
                   return
+                } else if (!clientReactController.signal.aborted) {
+                  const componentStack = errorInfo.componentStack
+                  if (typeof componentStack === 'string') {
+                    trackErrorInNavigation(
+                      possibleValidationBlockingErrors,
+                      err,
+                      componentStack
+                    )
+                  }
                 }
 
                 if (isReactLargeShellError(err)) {
@@ -4450,12 +4462,25 @@ async function validateInstantConfigNavigation(
       )
 
     const { preludeIsEmpty } = await processPrelude(unprocessedPrelude)
+
+    // If the validation didn't run fully e.g. because we didn't rendering all the boundaries,
+    // the validation result cannot be trusted.
+    const validationPreventedReasons = getValidationPreventedReasons(
+      workStore,
+      possibleValidationBlockingErrors,
+      boundaryState
+    )
+    if (validationPreventedReasons.length > 0) {
+      return { dynamicHoleKind, errors: validationPreventedReasons }
+    }
+
     const reasons = getNavigationDisallowedDynamicReasons(
       workStore,
       preludeIsEmpty ? PreludeState.Empty : PreludeState.Full,
       dynamicValidation
     )
-    return { dynamicHoleKind, errors: reasons } as const
+
+    return { dynamicHoleKind, errors: reasons }
   } catch (thrownValue) {
     // Even if the root errors we still want to report any cache components errors
     // that were discovered before the root errored.
