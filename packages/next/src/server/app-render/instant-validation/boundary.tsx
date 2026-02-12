@@ -1,19 +1,35 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { use, type ReactNode } from 'react'
 import { INSTANT_VALIDATION_BOUNDARY_NAME } from './boundary-constants'
+import { InvariantError } from '../../../shared/lib/invariant-error'
+import { InstantValidationBoundaryTrackingContext } from './boundary-tracking-context.external'
 
 // We use a namespace object to allow us to recover the name of the function
 // at runtime even when production bundling/minification is used.
 const NameSpace = {
   [INSTANT_VALIDATION_BOUNDARY_NAME]: function ({
+    id,
     children,
   }: {
+    id: string
     children: ReactNode
   }) {
+    // Track which boundaries we actually managed to render.
+    const state = use(InstantValidationBoundaryTrackingContext)
+    if (state === null) {
+      throw new InvariantError(
+        'Missing InstantValidationBoundaryTrackingContext'
+      )
+    }
+    state.renderedIds.add(id)
+
     return children
   },
 }
+
+export type InstantValidationBoundaryComponent =
+  typeof InstantValidationBoundary
 
 export const InstantValidationBoundary =
   // We use slice(0) to trick the bundler into not inlining/minifying the function

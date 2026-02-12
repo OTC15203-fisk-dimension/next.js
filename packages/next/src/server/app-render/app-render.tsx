@@ -240,6 +240,8 @@ import { createNodeStreamWithLateRelease } from './instant-validation/stream-uti
 
 // NOTE: Only use this for types, access implementations via ComponentMod
 import type * as InstantValidation from './instant-validation/instant-validation'
+import { createValidationBoundaryTracking } from './instant-validation/boundary-tracking'
+import { InstantValidationBoundaryTrackingContext } from './instant-validation/boundary-tracking-context.external'
 
 export type GetDynamicParamFromSegment = (
   // The LoaderTree to extract the dynamic param from
@@ -4340,6 +4342,7 @@ async function validateInstantConfigNavigation(
   const clientReferenceManifest = getClientReferenceManifest()
 
   const usedSegmentKinds = new Set<InstantValidation.SegmentStage>()
+  const boundaryState = createValidationBoundaryTracking()
   const { stream: serverStream, debugStream } =
     await createCombinedPayloadStream(
       (extraChunksReleaseSignal) =>
@@ -4349,6 +4352,7 @@ async function validateInstantConfigNavigation(
           routeTree,
           navigationParent,
           extraChunksReleaseSignal,
+          boundaryState,
           clientReferenceManifest,
           stageEndTimes,
           useRuntimeStageForPartialSegments,
@@ -4380,16 +4384,19 @@ async function validateInstantConfigNavigation(
             finalClientPrerenderStore,
             prerender,
             // eslint-disable-next-line @next/internal/no-ambiguous-jsx -- React Client
-            <App
-              reactServerStream={serverStream}
-              reactDebugStream={debugStream ?? undefined}
-              // Debug info is already filtered when constructing the combined payload.
-              debugEndTime={undefined}
-              preinitScripts={preinitScripts}
-              ServerInsertedHTMLProvider={ServerInsertedHTMLProvider}
-              nonce={nonce}
-              images={ctx.renderOpts.images}
-            />,
+            <InstantValidationBoundaryTrackingContext value={boundaryState}>
+              {/* eslint-disable-next-line @next/internal/no-ambiguous-jsx -- React Client */}
+              <App
+                reactServerStream={serverStream}
+                reactDebugStream={debugStream ?? undefined}
+                // Debug info is already filtered when constructing the combined payload.
+                debugEndTime={undefined}
+                preinitScripts={preinitScripts}
+                ServerInsertedHTMLProvider={ServerInsertedHTMLProvider}
+                nonce={nonce}
+                images={ctx.renderOpts.images}
+              />
+            </InstantValidationBoundaryTrackingContext>,
             {
               signal: clientReactController.signal,
               onError: (err: unknown, errorInfo: ErrorInfo) => {
@@ -4404,7 +4411,8 @@ async function validateInstantConfigNavigation(
                       componentStack,
                       dynamicValidation,
                       clientDynamicTracking,
-                      dynamicHoleKind
+                      dynamicHoleKind,
+                      boundaryState
                     )
                   }
                   return

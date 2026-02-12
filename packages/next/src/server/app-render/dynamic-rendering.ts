@@ -50,6 +50,7 @@ import { scheduleOnNextTick } from '../../lib/scheduler'
 import { BailoutToCSRError } from '../../shared/lib/lazy-dynamic/bailout-to-csr'
 import { InvariantError } from '../../shared/lib/invariant-error'
 import { INSTANT_VALIDATION_BOUNDARY_NAME } from './instant-validation/boundary-constants'
+import type { ValidationBoundaryTracking } from './instant-validation/boundary-tracking'
 
 const hasPostpone = typeof React.unstable_postpone === 'function'
 
@@ -84,7 +85,7 @@ export type DynamicTrackingState = {
 
 // Stores dynamic reasons used during an SSR render.
 export type DynamicValidationState = {
-  hasSuspenseAboveBody: boolean
+  allowEmptyPrelude: EmptyPreludeAllowedReason | null
   hasDynamicMetadata: boolean
   dynamicMetadata: null | Error
   hasDynamicViewport: boolean
@@ -102,9 +103,14 @@ export function createDynamicTrackingState(
   }
 }
 
+export enum EmptyPreludeAllowedReason {
+  SuspenseAboveBody = 1,
+  AllowedBlockingClient = 2,
+}
+
 export function createDynamicValidationState(): DynamicValidationState {
   return {
-    hasSuspenseAboveBody: false,
+    allowEmptyPrelude: null,
     hasDynamicMetadata: false,
     dynamicMetadata: null,
     hasDynamicViewport: false,
@@ -738,7 +744,8 @@ export function trackAllowedDynamicAccess(
     // But if you have Suspense above body, the prelude is empty but we allow that because having Suspense
     // is an explicit signal from the user that they acknowledge the empty shell and want dynamic rendering.
     dynamicValidation.hasAllowedDynamic = true
-    dynamicValidation.hasSuspenseAboveBody = true
+    dynamicValidation.allowEmptyPrelude =
+      EmptyPreludeAllowedReason.SuspenseAboveBody
     return
   } else if (hasSuspenseRegex.test(componentStack)) {
     // this error had a Suspense boundary above it so we don't need to report it as a source
@@ -775,7 +782,8 @@ export function trackDynamicHoleInNavigation(
   componentStack: string,
   dynamicValidation: DynamicValidationState,
   clientDynamic: DynamicTrackingState,
-  kind: DynamicHoleKind
+  kind: DynamicHoleKind,
+  boundaryState: ValidationBoundaryTracking
 ) {
   if (hasOutletRegex.test(componentStack)) {
     // We don't need to track that this is dynamic. It is only so when something else is also dynamic.
@@ -802,32 +810,62 @@ export function trackDynamicHoleInNavigation(
     return
   }
 
-  // Check if we have a Suspense above the hole, but below the validation boundary.
-  // If we do, then this dynamic usage wouldn't block a navigation to this subtree.
-  // Conversely, if the nearest suspense is above the validation boundary, then this subtree would block.
-  //
-  // Note that in the component stack, children come before parents.
-  //
-  // Valid:
-  //   ...
-  //   at Suspense
-  //   ...
-  //   at __next_prefetch_validation_boundary__
-  //
-  // Invalid:
-  //   ...
-  //   at __next_prefetch_validation_boundary__
-  //   ...
-  //   at Suspense
-  //
-  const suspenseLocation = hasSuspenseRegex.exec(componentStack)
-  if (suspenseLocation) {
-    const boundaryLocation =
-      hasPrefetchValidationBoundaryRegex.exec(componentStack)
-    if (boundaryLocation) {
+  const boundaryLocation =
+    hasPrefetchValidationBoundaryRegex.exec(componentStack)
+  if (!boundaryLocation) {
+    // We don't see the validation boundary in the component stack,
+    // so this hole must be coming from a shared parent.
+    // Shared parents are fully resolved and don't have RSC holes,
+    // but they can still suspend in a client component during SSR.
+
+    // If we managed to render all the validation boundaries, that means
+    // that the client holes aren't blocking validation and we can disregard them.
+    // Note that we don't even care whether they have suspense or not.
+    if (boundaryState.expectedIds.size === boundaryState.renderedIds.size) {
+      dynamicValidation.allowEmptyPrelude =
+        EmptyPreludeAllowedReason.AllowedBlockingClient
+      return
+    } else {
+      // TODO(instant-validation) TODO(NAR-787)
+      // If shared parents blocked us from validating, we should only log
+      // the errors from the innermost (segments), i.e. omit layouts whose
+      // slots managed to render (because clearly they didn't block validation)
+      const message = `Route "${workStore.route}": Could not validate \`unstable_instant\` because a Client Component in a parent segment prevented the page from rendering.`
+      const error = createErrorWithComponentOrOwnerStack(
+        message,
+        componentStack
+      )
+      dynamicValidation.dynamicErrors.push(error)
+      return
+    }
+  } else {
+    // The hole originates inside the validation boundary.
+    //
+    // Check if we have a Suspense above the hole, but below the validation boundary.
+    // If we do, then this dynamic usage wouldn't block a navigation to this subtree.
+    // Conversely, if the nearest suspense is above the validation boundary, then this subtree would block.
+    //
+    // Note that in the component stack, children come before parents.
+    //
+    // Valid:
+    //   ...
+    //   at Suspense
+    //   ...
+    //   at __next_prefetch_validation_boundary__
+    //
+    // Invalid:
+    //   ...
+    //   at __next_prefetch_validation_boundary__
+    //   ...
+    //   at Suspense
+    //
+    const suspenseLocation = hasSuspenseRegex.exec(componentStack)
+    if (suspenseLocation) {
       if (suspenseLocation.index < boundaryLocation.index) {
         dynamicValidation.hasAllowedDynamic = true
         return
+      } else {
+        // invalid - fallthrough
       }
     }
   }
@@ -878,7 +916,8 @@ export function trackDynamicHoleInRuntimeShell(
     // But if you have Suspense above body, the prelude is empty but we allow that because having Suspense
     // is an explicit signal from the user that they acknowledge the empty shell and want dynamic rendering.
     dynamicValidation.hasAllowedDynamic = true
-    dynamicValidation.hasSuspenseAboveBody = true
+    dynamicValidation.allowEmptyPrelude =
+      EmptyPreludeAllowedReason.SuspenseAboveBody
     return
   } else if (hasSuspenseRegex.test(componentStack)) {
     // this error had a Suspense boundary above it so we don't need to report it as a source
@@ -927,7 +966,8 @@ export function trackDynamicHoleInStaticShell(
     // But if you have Suspense above body, the prelude is empty but we allow that because having Suspense
     // is an explicit signal from the user that they acknowledge the empty shell and want dynamic rendering.
     dynamicValidation.hasAllowedDynamic = true
-    dynamicValidation.hasSuspenseAboveBody = true
+    dynamicValidation.allowEmptyPrelude =
+      EmptyPreludeAllowedReason.SuspenseAboveBody
     return
   } else if (hasSuspenseRegex.test(componentStack)) {
     // this error had a Suspense boundary above it so we don't need to report it as a source
@@ -1008,7 +1048,10 @@ export function throwIfDisallowedDynamic(
   }
 
   if (prelude !== PreludeState.Full) {
-    if (dynamicValidation.hasSuspenseAboveBody) {
+    if (
+      dynamicValidation.allowEmptyPrelude ===
+      EmptyPreludeAllowedReason.SuspenseAboveBody
+    ) {
       // This route has opted into allowing fully dynamic rendering
       // by including a Suspense boundary above the body. In this case
       // a lack of a shell is not considered disallowed so we simply return
@@ -1066,7 +1109,11 @@ export function getStaticShellDisallowedDynamicReasons(
   dynamicValidation: DynamicValidationState,
   configAllowsBlocking: boolean
 ): Array<Error> {
-  if (configAllowsBlocking || dynamicValidation.hasSuspenseAboveBody) {
+  if (
+    configAllowsBlocking ||
+    dynamicValidation.allowEmptyPrelude ===
+      EmptyPreludeAllowedReason.SuspenseAboveBody
+  ) {
     // This route has opted into allowing fully dynamic rendering
     // by including a Suspense boundary above the body. In this case
     // a lack of a shell is not considered disallowed so we simply return
@@ -1111,9 +1158,8 @@ export function getNavigationDisallowedDynamicReasons(
   prelude: PreludeState,
   dynamicValidation: DynamicValidationState
 ): Array<Error> {
-  // NOTE: We don't care about Suspense above body here
-  // TODO: Need to make sure the logic here actually makes sense
-
+  // NOTE: We don't care about Suspense above body here,
+  // we're only concerned with the validation boundary
   if (prelude !== PreludeState.Full) {
     // We didn't have any sync bailouts but there may be user code which
     // blocked the root. We would have captured these during the prerender
@@ -1124,6 +1170,14 @@ export function getNavigationDisallowedDynamicReasons(
     }
 
     if (prelude === PreludeState.Empty) {
+      // If a client component suspended prevented us from rendering a shell
+      // but didn't block validation, we don't require a prelude.
+      if (
+        dynamicValidation.allowEmptyPrelude ===
+        EmptyPreludeAllowedReason.AllowedBlockingClient
+      ) {
+        return []
+      }
       // If we ever get this far then we messed up the tracking of invalid dynamic.
       // We still adhere to the constraint that you must produce a shell but invite the
       // user to report this as a bug in Next.js.
