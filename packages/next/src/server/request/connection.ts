@@ -15,6 +15,7 @@ import {
 } from '../dynamic-rendering-utils'
 import { isRequestAPICallableInsideAfter } from './utils'
 import { RenderStage } from '../app-render/staged-rendering'
+import { InvariantError } from '../../shared/lib/invariant-error'
 
 /**
  * This function allows you to indicate that you require an actual user Request before continuing.
@@ -84,6 +85,12 @@ export function connection(): Promise<void> {
             workStore.route,
             '`connection()`'
           )
+        case 'validation-client': {
+          const exportName = '`connection`'
+          throw new InvariantError(
+            `${exportName} must not be used within a Client Component. Next.js should be preventing ${exportName} from being included in Client Components statically, but did not in this case.`
+          )
+        }
         case 'prerender-ppr':
           // We use React's postpone API to interrupt rendering here to create a
           // dynamic hole

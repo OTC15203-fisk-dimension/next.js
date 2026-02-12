@@ -23,6 +23,7 @@ import type {
   RequestStore,
   RevalidateStore,
   UseCacheStore,
+  ValidationStoreClient,
   WorkUnitStore,
 } from '../app-render/work-unit-async-storage.external'
 import {
@@ -84,7 +85,7 @@ interface PublicCacheContext {
   readonly kind: 'public'
   // TODO: We should probably forbid nesting "use cache" inside unstable_cache.
   readonly outerWorkUnitStore:
-    | Exclude<WorkUnitStore, PrerenderStoreModernClient>
+    | Exclude<WorkUnitStore, PrerenderStoreModernClient | ValidationStoreClient>
     | undefined
 }
 
@@ -957,6 +958,7 @@ export async function cache(
           workUnitStore
         )
       case 'prerender-client':
+      case 'validation-client':
         throw new InvariantError(
           `${expression} must not be used within a client component. Next.js should be preventing ${expression} from being allowed in client components statically, but did not in this case.`
         )
@@ -1003,6 +1005,7 @@ export async function cache(
   } else {
     switch (workUnitStore?.type) {
       case 'prerender-client':
+      case 'validation-client':
         const expression = '"use cache"'
         throw new InvariantError(
           `${expression} must not be used within a client component. Next.js should be preventing ${expression} from being allowed in client components statically, but did not in this case.`
@@ -1916,6 +1919,7 @@ function shouldForceRevalidate(
       case 'prerender-runtime':
       case 'prerender':
       case 'prerender-client':
+      case 'validation-client':
       case 'prerender-ppr':
       case 'prerender-legacy':
       case 'unstable-cache':
@@ -1959,6 +1963,7 @@ function shouldDiscardCacheEntry(
         return false
       case 'prerender-runtime':
       case 'prerender-client':
+      case 'validation-client':
       case 'prerender-ppr':
       case 'prerender-legacy':
       case 'request':

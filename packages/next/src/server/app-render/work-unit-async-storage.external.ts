@@ -102,18 +102,25 @@ export type PrerenderStoreModern =
   | PrerenderStoreModernClient
   | PrerenderStoreModernServer
   | PrerenderStoreModernRuntime
+  | ValidationStoreClient
 
 /** Like `PrerenderStoreModern`, but only including static prerenders (i.e. not runtime prerenders) */
 export type StaticPrerenderStoreModern = Exclude<
   PrerenderStoreModern,
-  PrerenderStoreModernRuntime
+  PrerenderStoreModernRuntime | ValidationStoreClient
 >
 
 export interface PrerenderStoreModernClient
   extends PrerenderStoreModernCommon,
     StaticPrerenderStoreCommon {
   readonly type: 'prerender-client'
-  readonly boundaryState?: ValidationBoundaryTracking
+}
+
+export interface ValidationStoreClient extends PrerenderStoreModernCommon {
+  readonly type: 'validation-client'
+  readonly boundaryState: ValidationBoundaryTracking | null
+  // When we implement build validation, the store will contain e.g. cookies
+  // and other values derived from samples.
 }
 
 export interface PrerenderStoreModernServer
@@ -269,7 +276,7 @@ export type PrerenderStore =
 // /** Like `PrerenderStoreModern`, but only including static prerenders (i.e. not runtime prerenders) */
 export type StaticPrerenderStore = Exclude<
   PrerenderStore,
-  PrerenderStoreModernRuntime
+  PrerenderStoreModernRuntime | ValidationStoreClient
 >
 
 export interface CommonCacheStore
@@ -368,6 +375,7 @@ export function getPrerenderResumeDataCache(
     case 'prerender-ppr':
       return workUnitStore.prerenderResumeDataCache
     case 'prerender-client':
+    case 'validation-client':
       // TODO eliminate fetch caching in client scope and stop exposing this data
       // cache during SSR.
       return workUnitStore.prerenderResumeDataCache
@@ -396,6 +404,7 @@ export function getRenderResumeDataCache(
     case 'prerender':
     case 'prerender-runtime':
     case 'prerender-client':
+    case 'validation-client':
       if (workUnitStore.renderResumeDataCache) {
         // If we are in a prerender, we might have a render resume data cache
         // that is used to read from prefilled caches.
@@ -430,6 +439,7 @@ export function getHmrRefreshHash(
       case 'request':
         return workUnitStore.cookies.get(NEXT_HMR_REFRESH_HASH_COOKIE)?.value
       case 'prerender-client':
+      case 'validation-client':
       case 'prerender-ppr':
       case 'prerender-legacy':
       case 'unstable-cache':
@@ -454,6 +464,7 @@ export function isHmrRefresh(
         return workUnitStore.isHmrRefresh ?? false
       case 'prerender':
       case 'prerender-client':
+      case 'validation-client':
       case 'prerender-runtime':
       case 'prerender-ppr':
       case 'prerender-legacy':
@@ -479,6 +490,7 @@ export function getServerComponentsHmrCache(
         return workUnitStore.serverComponentsHmrCache
       case 'prerender':
       case 'prerender-client':
+      case 'validation-client':
       case 'prerender-runtime':
       case 'prerender-ppr':
       case 'prerender-legacy':
@@ -509,6 +521,7 @@ export function getDraftModeProviderForCacheScope(
         return workUnitStore.draftMode
       case 'prerender':
       case 'prerender-client':
+      case 'validation-client':
       case 'prerender-ppr':
       case 'prerender-legacy':
         break
@@ -526,6 +539,7 @@ export function getCacheSignal(
   switch (workUnitStore.type) {
     case 'prerender':
     case 'prerender-client':
+    case 'validation-client':
     case 'prerender-runtime':
       return workUnitStore.cacheSignal
     case 'request': {
@@ -555,6 +569,7 @@ export function getRuntimeStagePromise(
       return workUnitStore.runtimeStagePromise
     case 'prerender':
     case 'prerender-client':
+    case 'validation-client':
     case 'prerender-ppr':
     case 'prerender-legacy':
     case 'request':

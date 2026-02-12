@@ -26,6 +26,7 @@ import type {
   PrerenderStoreLegacy,
   PrerenderStoreModern,
   PrerenderStoreModernRuntime,
+  ValidationStoreClient,
 } from '../app-render/work-unit-async-storage.external'
 
 // Once postpone is in stable we should switch to importing the postpone export directly
@@ -243,6 +244,7 @@ export function trackDynamicDataInDynamicRender(workUnitStore: WorkUnitStore) {
     case 'prerender-legacy':
     case 'prerender-ppr':
     case 'prerender-client':
+    case 'validation-client':
       break
     case 'request':
       if (process.env.NODE_ENV !== 'production') {
@@ -552,6 +554,7 @@ export function createHangingInputAbortSignal(
 
       return controller.signal
     case 'prerender-client':
+    case 'validation-client':
     case 'prerender-ppr':
     case 'prerender-legacy':
     case 'request':
@@ -566,7 +569,7 @@ export function createHangingInputAbortSignal(
 
 export function annotateDynamicAccess(
   expression: string,
-  prerenderStore: PrerenderStoreModern
+  prerenderStore: PrerenderStoreModern | ValidationStoreClient
 ) {
   const dynamicTracking = prerenderStore.dynamicTracking
   if (dynamicTracking) {
@@ -622,6 +625,9 @@ export function useDynamicRouteParams(expression: string) {
         throw new InvariantError(
           `\`${expression}\` was called inside a cache scope. Next.js should be preventing ${expression} from being included in server components statically, but did not in this case.`
         )
+      case 'validation-client':
+        // TODO(instant-validation): in build, this depends on samples
+        break
       case 'prerender-legacy':
       case 'request':
       case 'unstable-cache':
@@ -646,6 +652,9 @@ export function useDynamicSearchParams(expression: string) {
   }
 
   switch (workUnitStore.type) {
+    case 'validation-client':
+      // TODO(instant-validation): in build, this depends on samples
+      return
     case 'prerender-client': {
       React.use(
         makeHangingPromise(
