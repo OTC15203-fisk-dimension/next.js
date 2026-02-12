@@ -85,7 +85,7 @@ export type DynamicTrackingState = {
 
 // Stores dynamic reasons used during an SSR render.
 export type DynamicValidationState = {
-  allowEmptyPrelude: EmptyPreludeAllowedReason | null
+  hasSuspenseAboveBody: boolean
   hasDynamicMetadata: boolean
   dynamicMetadata: null | Error
   hasDynamicViewport: boolean
@@ -103,14 +103,9 @@ export function createDynamicTrackingState(
   }
 }
 
-export enum EmptyPreludeAllowedReason {
-  SuspenseAboveBody = 1,
-  AllowedBlockingClient = 2,
-}
-
 export function createDynamicValidationState(): DynamicValidationState {
   return {
-    allowEmptyPrelude: null,
+    hasSuspenseAboveBody: false,
     hasDynamicMetadata: false,
     dynamicMetadata: null,
     hasDynamicViewport: false,
@@ -744,8 +739,7 @@ export function trackAllowedDynamicAccess(
     // But if you have Suspense above body, the prelude is empty but we allow that because having Suspense
     // is an explicit signal from the user that they acknowledge the empty shell and want dynamic rendering.
     dynamicValidation.hasAllowedDynamic = true
-    dynamicValidation.allowEmptyPrelude =
-      EmptyPreludeAllowedReason.SuspenseAboveBody
+    dynamicValidation.hasSuspenseAboveBody = true
     return
   } else if (hasSuspenseRegex.test(componentStack)) {
     // this error had a Suspense boundary above it so we don't need to report it as a source
@@ -777,10 +771,35 @@ export enum DynamicHoleKind {
   Dynamic = 2,
 }
 
+/** Stores dynamic reasons used during an SSR render in instant validation. */
+export type InstantValidationState = {
+  hasDynamicMetadata: boolean
+  hasAllowedClientDynamicAboveBoundary: boolean
+  dynamicMetadata: null | Error
+  hasDynamicViewport: boolean
+  hasAllowedDynamic: boolean
+  dynamicErrors: Array<Error>
+  validationPreventingErrors: Array<Error>
+  thrownErrorsOutsideBoundary: Array<unknown>
+}
+
+export function createInstantValidationState(): InstantValidationState {
+  return {
+    hasDynamicMetadata: false,
+    hasAllowedClientDynamicAboveBoundary: false,
+    dynamicMetadata: null,
+    hasDynamicViewport: false,
+    hasAllowedDynamic: false,
+    dynamicErrors: [],
+    validationPreventingErrors: [],
+    thrownErrorsOutsideBoundary: [],
+  }
+}
+
 export function trackDynamicHoleInNavigation(
   workStore: WorkStore,
   componentStack: string,
-  dynamicValidation: DynamicValidationState,
+  dynamicValidation: InstantValidationState,
   clientDynamic: DynamicTrackingState,
   kind: DynamicHoleKind,
   boundaryState: ValidationBoundaryTracking
@@ -822,8 +841,8 @@ export function trackDynamicHoleInNavigation(
     // that the client holes aren't blocking validation and we can disregard them.
     // Note that we don't even care whether they have suspense or not.
     if (boundaryState.expectedIds.size === boundaryState.renderedIds.size) {
-      dynamicValidation.allowEmptyPrelude =
-        EmptyPreludeAllowedReason.AllowedBlockingClient
+      dynamicValidation.hasAllowedClientDynamicAboveBoundary = true
+      dynamicValidation.hasAllowedDynamic = true // Holes outside the boundary contribute to allowing dynamic metadata
       return
     } else {
       // TODO(instant-validation) TODO(NAR-787)
@@ -835,7 +854,7 @@ export function trackDynamicHoleInNavigation(
         message,
         componentStack
       )
-      dynamicValidation.dynamicErrors.push(error)
+      dynamicValidation.validationPreventingErrors.push(error)
       return
     }
   } else {
@@ -888,8 +907,8 @@ export function trackDynamicHoleInNavigation(
   return
 }
 
-export function trackErrorInNavigation(
-  possibleValidationBlockingErrors: unknown[],
+export function trackThrownErrorInNavigation(
+  dynamicValidation: InstantValidationState,
   error: unknown,
   componentStack: string
 ) {
@@ -898,38 +917,7 @@ export function trackErrorInNavigation(
   if (hasPrefetchValidationBoundaryRegex.test(componentStack)) {
     return
   }
-  possibleValidationBlockingErrors.push(error)
-}
-
-export function getValidationPreventedReasons(
-  workStore: WorkStore,
-  possibleValidationBlockingErrors: unknown[],
-  boundaryState: ValidationBoundaryTracking
-): Error[] {
-  if (boundaryState.renderedIds.size < boundaryState.expectedIds.size) {
-    if (possibleValidationBlockingErrors.length === 0) {
-      return [
-        new Error(
-          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering for an unknown reason.`
-        ),
-      ]
-    } else if (possibleValidationBlockingErrors.length === 1) {
-      return [
-        new Error(
-          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to the following error.`
-        ),
-        possibleValidationBlockingErrors[0] as Error,
-      ]
-    } else {
-      return [
-        new Error(
-          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to one of the following errors.`
-        ),
-        ...(possibleValidationBlockingErrors as Error[]),
-      ]
-    }
-  }
-  return []
+  dynamicValidation.thrownErrorsOutsideBoundary.push(error)
 }
 
 export function trackDynamicHoleInRuntimeShell(
@@ -960,8 +948,7 @@ export function trackDynamicHoleInRuntimeShell(
     // But if you have Suspense above body, the prelude is empty but we allow that because having Suspense
     // is an explicit signal from the user that they acknowledge the empty shell and want dynamic rendering.
     dynamicValidation.hasAllowedDynamic = true
-    dynamicValidation.allowEmptyPrelude =
-      EmptyPreludeAllowedReason.SuspenseAboveBody
+    dynamicValidation.hasSuspenseAboveBody = true
     return
   } else if (hasSuspenseRegex.test(componentStack)) {
     // this error had a Suspense boundary above it so we don't need to report it as a source
@@ -1010,8 +997,7 @@ export function trackDynamicHoleInStaticShell(
     // But if you have Suspense above body, the prelude is empty but we allow that because having Suspense
     // is an explicit signal from the user that they acknowledge the empty shell and want dynamic rendering.
     dynamicValidation.hasAllowedDynamic = true
-    dynamicValidation.allowEmptyPrelude =
-      EmptyPreludeAllowedReason.SuspenseAboveBody
+    dynamicValidation.hasSuspenseAboveBody = true
     return
   } else if (hasSuspenseRegex.test(componentStack)) {
     // this error had a Suspense boundary above it so we don't need to report it as a source
@@ -1092,10 +1078,7 @@ export function throwIfDisallowedDynamic(
   }
 
   if (prelude !== PreludeState.Full) {
-    if (
-      dynamicValidation.allowEmptyPrelude ===
-      EmptyPreludeAllowedReason.SuspenseAboveBody
-    ) {
+    if (dynamicValidation.hasSuspenseAboveBody) {
       // This route has opted into allowing fully dynamic rendering
       // by including a Suspense boundary above the body. In this case
       // a lack of a shell is not considered disallowed so we simply return
@@ -1153,11 +1136,7 @@ export function getStaticShellDisallowedDynamicReasons(
   dynamicValidation: DynamicValidationState,
   configAllowsBlocking: boolean
 ): Array<Error> {
-  if (
-    configAllowsBlocking ||
-    dynamicValidation.allowEmptyPrelude ===
-      EmptyPreludeAllowedReason.SuspenseAboveBody
-  ) {
+  if (configAllowsBlocking || dynamicValidation.hasSuspenseAboveBody) {
     // This route has opted into allowing fully dynamic rendering
     // by including a Suspense boundary above the body. In this case
     // a lack of a shell is not considered disallowed so we simply return
@@ -1200,8 +1179,39 @@ export function getStaticShellDisallowedDynamicReasons(
 export function getNavigationDisallowedDynamicReasons(
   workStore: WorkStore,
   prelude: PreludeState,
-  dynamicValidation: DynamicValidationState
+  dynamicValidation: InstantValidationState,
+  boundaryState: ValidationBoundaryTracking
 ): Array<Error> {
+  const { validationPreventingErrors } = dynamicValidation
+  if (validationPreventingErrors.length > 0) {
+    return validationPreventingErrors
+  }
+
+  if (boundaryState.renderedIds.size < boundaryState.expectedIds.size) {
+    const { thrownErrorsOutsideBoundary } = dynamicValidation
+    if (thrownErrorsOutsideBoundary.length === 0) {
+      return [
+        new Error(
+          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering for an unknown reason.`
+        ),
+      ]
+    } else if (thrownErrorsOutsideBoundary.length === 1) {
+      return [
+        new Error(
+          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to the following error.`
+        ),
+        thrownErrorsOutsideBoundary[0] as Error,
+      ]
+    } else {
+      return [
+        new Error(
+          `Route "${workStore.route}": Could not validate \`unstable_instant\` because the target segment was prevented from rendering, likely due to one of the following errors.`
+        ),
+        ...(thrownErrorsOutsideBoundary as Error[]),
+      ]
+    }
+  }
+
   // NOTE: We don't care about Suspense above body here,
   // we're only concerned with the validation boundary
   if (prelude !== PreludeState.Full) {
@@ -1213,10 +1223,7 @@ export function getNavigationDisallowedDynamicReasons(
     if (prelude === PreludeState.Empty) {
       // If a client component suspended prevented us from rendering a shell
       // but didn't block validation, we don't require a prelude.
-      if (
-        dynamicValidation.allowEmptyPrelude ===
-        EmptyPreludeAllowedReason.AllowedBlockingClient
-      ) {
+      if (dynamicValidation.hasAllowedClientDynamicAboveBoundary) {
         return []
       }
       // If we ever get this far then we messed up the tracking of invalid dynamic.

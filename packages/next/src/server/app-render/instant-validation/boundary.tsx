@@ -28,9 +28,6 @@ const NameSpace = {
   },
 }
 
-export type InstantValidationBoundaryComponent =
-  typeof InstantValidationBoundary
-
 export const InstantValidationBoundary =
   // We use slice(0) to trick the bundler into not inlining/minifying the function
   // so it retains the name inferred from the namespace object

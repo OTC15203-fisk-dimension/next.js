@@ -142,8 +142,8 @@ import {
   getNavigationDisallowedDynamicReasons,
   trackDynamicHoleInNavigation,
   DynamicHoleKind,
-  trackErrorInNavigation,
-  getValidationPreventedReasons,
+  trackThrownErrorInNavigation,
+  createInstantValidationState,
 } from './dynamic-rendering'
 import {
   getClientComponentLoaderMetrics,
@@ -4339,9 +4339,8 @@ async function validateInstantConfigNavigation(
     varyParamsAccumulator: null,
   }
 
-  const dynamicValidation = createDynamicValidationState()
+  const dynamicValidation = createInstantValidationState()
   const boundaryState = createValidationBoundaryTracking()
-  const possibleValidationBlockingErrors: unknown[] = []
 
   const clientReferenceManifest = getClientReferenceManifest()
 
@@ -4422,8 +4421,8 @@ async function validateInstantConfigNavigation(
                 } else if (!clientReactController.signal.aborted) {
                   const componentStack = errorInfo.componentStack
                   if (typeof componentStack === 'string') {
-                    trackErrorInNavigation(
-                      possibleValidationBlockingErrors,
+                    trackThrownErrorInNavigation(
+                      dynamicValidation,
                       err,
                       componentStack
                     )
@@ -4463,21 +4462,11 @@ async function validateInstantConfigNavigation(
 
     const { preludeIsEmpty } = await processPrelude(unprocessedPrelude)
 
-    // If the validation didn't run fully e.g. because we didn't rendering all the boundaries,
-    // the validation result cannot be trusted.
-    const validationPreventedReasons = getValidationPreventedReasons(
-      workStore,
-      possibleValidationBlockingErrors,
-      boundaryState
-    )
-    if (validationPreventedReasons.length > 0) {
-      return { dynamicHoleKind, errors: validationPreventedReasons }
-    }
-
     const reasons = getNavigationDisallowedDynamicReasons(
       workStore,
       preludeIsEmpty ? PreludeState.Empty : PreludeState.Full,
-      dynamicValidation
+      dynamicValidation,
+      boundaryState
     )
 
     return { dynamicHoleKind, errors: reasons }
@@ -4487,7 +4476,8 @@ async function validateInstantConfigNavigation(
     let errors: Array<unknown> = getNavigationDisallowedDynamicReasons(
       workStore,
       PreludeState.Errored,
-      dynamicValidation
+      dynamicValidation,
+      boundaryState
     )
 
     if (process.env.NEXT_DEBUG_BUILD || process.env.__NEXT_VERBOSE_LOGGING) {
