@@ -2,6 +2,7 @@ use anyhow::Result;
 use turbo_rcstr::RcStr;
 use turbo_tasks::{ResolvedVc, ValueToString, Vc};
 use turbopack_core::{
+    boundary::BoundaryInfo,
     chunk::{ChunkingType, ChunkingTypeOption},
     module::Module,
     reference::ModuleReference,
@@ -13,6 +14,7 @@ use turbopack_core::{
 #[derive(Hash, Debug)]
 pub struct InternalCssAssetReference {
     module: ResolvedVc<Box<dyn Module>>,
+    boundary: Option<ResolvedVc<BoundaryInfo>>,
 }
 
 #[turbo_tasks::value_impl]
@@ -20,7 +22,19 @@ impl InternalCssAssetReference {
     /// Creates a new [`Vc<InternalCssAssetReference>`].
     #[turbo_tasks::function]
     pub fn new(module: ResolvedVc<Box<dyn Module>>) -> Vc<Self> {
-        Self::cell(InternalCssAssetReference { module })
+        Self::cell(InternalCssAssetReference {
+            module,
+            boundary: None,
+        })
+    }
+
+    /// Creates a new [`Vc<InternalCssAssetReference>`] with boundary info.
+    #[turbo_tasks::function]
+    pub fn new_with_boundary(
+        module: ResolvedVc<Box<dyn Module>>,
+        boundary: Option<ResolvedVc<BoundaryInfo>>,
+    ) -> Vc<Self> {
+        Self::cell(InternalCssAssetReference { module, boundary })
     }
 }
 
@@ -28,7 +42,11 @@ impl InternalCssAssetReference {
 impl ModuleReference for InternalCssAssetReference {
     #[turbo_tasks::function]
     fn resolve_reference(&self) -> Vc<ModuleResolveResult> {
-        *ModuleResolveResult::module(self.module)
+        if let Some(boundary) = self.boundary {
+            *ModuleResolveResult::module_with_boundary(self.module, boundary)
+        } else {
+            *ModuleResolveResult::module(self.module)
+        }
     }
 
     #[turbo_tasks::function]

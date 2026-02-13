@@ -271,7 +271,11 @@ async fn apply_module_type(
         }
     }
 
-    Ok(ProcessResult::Module(module).cell())
+    Ok(ProcessResult::Module {
+        module,
+        boundary: None,
+    }
+    .cell())
 }
 
 async fn apply_reexport_tree_shaking(
@@ -877,8 +881,11 @@ impl AssetContext for ModuleAssetContext {
                     Ok(match item {
                         ResolveResultItem::Source(source) => {
                             match &*self.process(*source, reference_type).await? {
-                                ProcessResult::Module(module) => {
-                                    ModuleResolveResultItem::Module(*module)
+                                ProcessResult::Module { module, boundary } => {
+                                    ModuleResolveResultItem::Module {
+                                        module: *module,
+                                        boundary: *boundary,
+                                    }
                                 }
                                 ProcessResult::Unknown(source) => {
                                     ModuleResolveResultItem::Unknown(*source)
@@ -1076,7 +1083,8 @@ pub async fn replace_external(
         .to_resolved()
         .await?;
 
-    Ok(Some(ModuleResolveResultItem::Module(ResolvedVc::upcast(
-        module,
-    ))))
+    Ok(Some(ModuleResolveResultItem::Module {
+        module: ResolvedVc::upcast(module),
+        boundary: None,
+    }))
 }

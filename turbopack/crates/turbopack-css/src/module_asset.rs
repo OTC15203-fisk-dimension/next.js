@@ -85,12 +85,18 @@ impl Module for ModuleCssAsset {
         // 1. @import or composes references are loaded first
         // 2. The local CSS is loaded last
 
-        let references = self
-            .module_references()
-            .await?
-            .iter()
-            .copied()
-            .chain(
+        let inner_result = self
+            .inner(ReferenceType::Css(CssReferenceSubType::Inner))
+            .await?;
+        let inner_ref = match &*inner_result {
+            ProcessResult::Module { module, boundary } => Some(
+                InternalCssAssetReference::new_with_boundary(**module, boundary.map(|b| *b))
+                    .to_resolved()
+                    .await
+                    .map(ResolvedVc::upcast)?,
+            ),
+            _ => {
+                // Fall back to try_into_module for unknown/ignore handling
                 match *self
                     .inner(ReferenceType::Css(CssReferenceSubType::Inner))
                     .try_into_module()
@@ -103,8 +109,16 @@ impl Module for ModuleCssAsset {
                             .map(ResolvedVc::upcast)?,
                     ),
                     None => None,
-                },
-            )
+                }
+            }
+        };
+
+        let references = self
+            .module_references()
+            .await?
+            .iter()
+            .copied()
+            .chain(inner_ref)
             .collect();
 
         Ok(Vc::cell(references))

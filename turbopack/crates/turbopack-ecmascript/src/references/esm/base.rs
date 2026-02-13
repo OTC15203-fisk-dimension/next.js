@@ -291,9 +291,9 @@ impl ReferencedAsset {
                 } => {
                     return Ok(ReferencedAsset::External(request.clone(), *ty).cell());
                 }
-                &ModuleResolveResultItem::Module(module) => {
+                ModuleResolveResultItem::Module { module, .. } => {
                     if let Some(placeable) =
-                        ResolvedVc::try_downcast::<Box<dyn EcmascriptChunkPlaceable>>(module)
+                        ResolvedVc::try_downcast::<Box<dyn EcmascriptChunkPlaceable>>(*module)
                     {
                         return Ok(ReferencedAsset::Some(placeable).cell());
                     }
@@ -483,6 +483,11 @@ impl ModuleReference for EsmAssetReference {
                     })
                 } else if chunking_type == "none" {
                     None
+                } else if chunking_type == "shared" {
+                    Some(ChunkingType::Shared {
+                        inherit_async: true,
+                        merge_tag: self.annotations.transition().map(|t| t.to_string().into()),
+                    })
                 } else {
                     return Err(anyhow!(
                         "unknown chunking_type: {}",

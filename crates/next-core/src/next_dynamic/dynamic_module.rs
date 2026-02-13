@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use anyhow::Result;
 use indoc::formatdoc;
 use turbo_rcstr::{RcStr, rcstr};
@@ -7,7 +9,7 @@ use turbopack_core::{
     ident::AssetIdent,
     module::{Module, ModuleSideEffects},
     module_graph::ModuleGraph,
-    reference::{ModuleReference, ModuleReferences, SingleChunkableModuleReference},
+    reference::{ModuleReferences, SingleChunkableModuleReference},
     resolve::ExportUsage,
     source::OptionSource,
 };
@@ -16,7 +18,7 @@ use turbopack_ecmascript::{
         EcmascriptChunkItemContent, EcmascriptChunkPlaceable, EcmascriptExports,
         ecmascript_chunk_item,
     },
-    references::esm::EsmExports,
+    references::esm::{EsmExport, EsmExports},
     runtime_functions::{TURBOPACK_EXPORT_NAMESPACE, TURBOPACK_IMPORT},
     utils::StringifyJs,
 };
@@ -78,35 +80,54 @@ impl ChunkableModule for NextDynamicEntryModule {
     #[turbo_tasks::function]
     fn as_chunk_item(
         self: ResolvedVc<Self>,
-        module_graph: ResolvedVc<ModuleGraph>,
+        module_graph: Vc<ModuleGraph>,
         chunking_context: ResolvedVc<Box<dyn ChunkingContext>>,
     ) -> Vc<Box<dyn turbopack_core::chunk::ChunkItem>> {
-        ecmascript_chunk_item(ResolvedVc::upcast(self), module_graph, chunking_context)
+        ecmascript_chunk_item(Vc::upcast(*self), module_graph, *chunking_context)
     }
 }
 
 #[turbo_tasks::value_impl]
 impl EcmascriptChunkPlaceable for NextDynamicEntryModule {
     #[turbo_tasks::function]
-    fn get_exports(&self) -> Vc<EcmascriptExports> {
-        let module_reference: Vc<Box<dyn ModuleReference>> =
-            Vc::upcast(SingleChunkableModuleReference::new(
+    async fn get_exports(&self) -> Result<Vc<EcmascriptExports>> {
+        let module_reference = ResolvedVc::upcast(
+            SingleChunkableModuleReference::new(
                 Vc::upcast(*self.module),
                 dynamic_ref_description(),
                 ExportUsage::all(),
-            ));
-        EsmExports::reexport_including_default(module_reference)
+            )
+            .to_resolved()
+            .await?,
+        );
+
+        let mut exports = BTreeMap::new();
+        let default = rcstr!("default");
+        exports.insert(
+            default.clone(),
+            EsmExport::ImportedBinding(module_reference, default, false),
+        );
+
+        Ok(EcmascriptExports::EsmExports(
+            EsmExports {
+                exports,
+                star_exports: vec![module_reference],
+            }
+            .resolved_cell(),
+        )
+        .cell())
     }
 
     #[turbo_tasks::function]
     async fn chunk_item_content(
-        &self,
+        self: Vc<Self>,
         chunking_context: Vc<Box<dyn ChunkingContext>>,
         _module_graph: Vc<ModuleGraph>,
         _async_module_info: Option<Vc<AsyncModuleInfo>>,
         _estimated: bool,
     ) -> Result<Vc<EcmascriptChunkItemContent>> {
-        let module_id = self.module.chunk_item_id(chunking_context).await?;
+        let inner = self.await?;
+        let module_id = inner.module.chunk_item_id(chunking_context).await?;
         Ok(EcmascriptChunkItemContent {
             inner_code: formatdoc!(
                 r#"
